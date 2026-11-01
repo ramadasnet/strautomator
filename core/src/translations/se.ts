@@ -87,6 +87,7 @@ const seLang: LanguageString = {
         Kayaking: "Kajak",
         Kitesurf: "Kitesurfing",
         NordicSki: "Längdskidåkning",
+        PhysicalTherapy: "Fysioterapi",
         Pickleball: "Pickleball",
         Pilates: "Pilates",
         Racquetball: "Racquetball",

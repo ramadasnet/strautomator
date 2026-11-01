@@ -50,6 +50,7 @@ export const useStrava = () => {
         if (sportType == "Snowboard") return "mdi-snowboard"
         if (sportType == "Swim") return "mdi-swim"
         if (sportType == "Yoga" || sportType == "Pilates") return "mdi-yoga"
+        if (sportType == "PhysicalTherapy") return "mdi-medical-bag"
         if (sportType == "Sail") return "mdi-sail-boat"
         if (sportType == "IceSkate") return "mdi-skate"
         if (sportType == "Hike") return "mdi-hiking"

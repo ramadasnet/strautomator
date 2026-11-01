@@ -87,6 +87,7 @@ const esLang: LanguageString = {
         Kayaking: "Kayak",
         Kitesurf: "Kitesurf",
         NordicSki: "Esquí de fondo",
+        PhysicalTherapy: "Fisioterapia",
         Pickleball: "Pickleball",
         Pilates: "Pilates",
         Racquetball: "Ráquetbol",
