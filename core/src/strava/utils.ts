@@ -771,7 +771,7 @@ export const calculatePowerIntervals = (watts: number[]): StravaActivityPerforma
  * @param source The relevant Strava activity or club event.
  */
 export function getSportIcon(source: StravaActivity | StravaClubEvent): string {
-    const sportType = source["type"] || source["sportType"]
+    const sportType = source["sportType"] || source["type"]
 
     switch (sportType) {
         case "Ride":
