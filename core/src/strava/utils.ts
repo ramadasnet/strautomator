@@ -836,6 +836,8 @@ export function getSportIcon(source: StravaActivity | StravaClubEvent): string {
             return "🏋️‍♂️"
         case "Yoga":
             return "🧘"
+        case "PhysicalTherapy":
+            return "🩺"
         case "Pilates":
             return "🧘🏻‍♀️"
         case "Wheelchair":

@@ -87,6 +87,7 @@ const enLang: LanguageString = {
         Kayaking: "Kajakken",
         Kitesurf: "Kitesurfen",
         NordicSki: "Noords skiën",
+        PhysicalTherapy: "Fysiotherapie",
         Pickleball: "Picklebal",
         Pilates: "Pilates",
         Racquetball: "Racquetball",

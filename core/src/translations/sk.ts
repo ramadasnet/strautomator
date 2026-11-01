@@ -87,6 +87,7 @@ const skLang: LanguageString = {
         Kayaking: "Kajakárstvo",
         Kitesurf: "Kitesurfing",
         NordicSki: "Bežecké lyžovanie",
+        PhysicalTherapy: "Fyzioterapia",
         Pickleball: "Pickleball",
         Pilates: "Pilates",
         Racquetball: "Raketbal",

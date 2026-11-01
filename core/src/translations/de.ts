@@ -87,6 +87,7 @@ const deLang: LanguageString = {
         Kayaking: "Kajakfahren",
         Kitesurf: "Kitesurfen",
         NordicSki: "Nordischer Skilanglauf",
+        PhysicalTherapy: "Physiotherapie",
         Pickleball: "Pickleball",
         Pilates: "Pilates",
         Racquetball: "Racquetball",

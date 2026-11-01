@@ -88,6 +88,7 @@ export interface LanguageString {
         Kayaking: string
         Kitesurf: string
         NordicSki: string
+        PhysicalTherapy: string
         Pickleball: string
         Pilates: string
         Racquetball: string
