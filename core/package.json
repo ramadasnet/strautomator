@@ -12,7 +12,8 @@
         "directory": "core"
     },
     "scripts": {
-        "prepare": "tsc"
+        "prepare": "tsc",
+        "test": "tsc && node --test test/*.test.js"
     },
     "dependencies": {
         "@google-cloud/firestore": "^9.4.0",

@@ -83,6 +83,28 @@ export const axiosRequest = async (options: AxiosConfig): Promise<AxiosResponse 
     const urlInfo = new url.URL(options.url)
     const logUrl = `${urlInfo.hostname}${urlInfo.pathname}`
 
+    // Remove credentials from the failed request before the error travels up,
+    // so tokens and secrets are never written to the logs by callers.
+    const scrubError = (ex: any): void => {
+        if (ex.config?.headers) {
+            delete ex.config.headers.Authorization
+            delete ex.config.headers.authorization
+        }
+        if (ex.config?.data) {
+            delete ex.config.data
+        }
+        if (ex.config?.auth) {
+            delete ex.config.auth
+        }
+        if (ex.config?.url) {
+            ex.config.url = ex.config.url.split("?")[0]
+        }
+        delete ex.request
+        if (ex.response?.request) {
+            ex.response.request = null
+        }
+    }
+
     try {
         if (!options.method) options.method = "GET"
         if (!options.timeout) options.timeout = settings.axios.timeout
@@ -104,6 +126,8 @@ export const axiosRequest = async (options: AxiosConfig): Promise<AxiosResponse 
         await rateLimitDelay(res, urlInfo, options.rateLimitExtractor)
         return res.status == 204 && !res.data ? true : options.returnResponse ? res : res.data
     } catch (ex) {
+        scrubError(ex)
+
         const statusCode = ex.response?.status || 500
         if (!ex.statusCode) {
             ex.statusCode = statusCode
@@ -143,7 +167,8 @@ export const axiosRequest = async (options: AxiosConfig): Promise<AxiosResponse 
                 await rateLimitDelay(res, urlInfo, options.rateLimitExtractor)
                 return res.status == 204 && !res.data ? true : options.returnResponse ? res : res.data
             } catch (innerEx) {
-                if (!innerEx.url) innerEx.url = options.url
+                scrubError(innerEx)
+                if (!innerEx.url) innerEx.url = options.url.split("?")[0]
                 if (isTimeout) innerEx.isTimeout = true
                 logger.warn("Axios.axiosRequest", options.method, logUrl, ex, "Failed twice, will not retry")
 
@@ -151,7 +176,7 @@ export const axiosRequest = async (options: AxiosConfig): Promise<AxiosResponse 
             }
         }
 
-        if (!ex.url) ex.url = options.url
+        if (!ex.url) ex.url = options.url.split("?")[0]
         if (isTimeout) ex.isTimeout = true
         throw ex
     }
