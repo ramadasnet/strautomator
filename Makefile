@@ -27,4 +27,4 @@ deploy:
 	git push
 	git push origin "v$(VERSION)"
 
-.PHONY: update
+.PHONY: clean-tags docker-build deploy update
