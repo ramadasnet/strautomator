@@ -1,12 +1,22 @@
 VERSION:= $(shell date '+%y.%-V%u.1%H%M')
 
+# Clean GIT tags.
+clean-tags:
+	git tag | xargs git tag -d
+	git fetch -t
+
 # Build the web Docker image locally (from the repo root, as it depends on the local core).
 docker-build:
 	docker buildx build --platform linux/arm64 -f web/Dockerfile -t strautomator/web .
 
+update:
+	$(MAKE) -C core update
+	$(MAKE) -C functions update
+	$(MAKE) -C web update
+
 # Release to production: set the new version, commit, create a vX tag and push it to GitHub.
 # The tag triggers the Cloud Build pipeline which builds and deploys the web and functions.
-deploy-git:
+deploy:
 	@test "$$(git rev-parse --abbrev-ref HEAD)" = "master" || (echo "Releases must be created from the master branch." && exit 1)
 	@git diff --quiet && git diff --cached --quiet || (echo "Commit or stash your changes before releasing." && exit 1)
 	git pull --ff-only
@@ -17,4 +27,4 @@ deploy-git:
 	git push
 	git push origin "v$(VERSION)"
 
-.PHONY: docker-build deploy-git
+.PHONY: clean-tags docker-build deploy update

@@ -1,4 +1,5 @@
 TSC:= ./node_modules/.bin/tsc
+SETMEUP:= ./node_modules/.bin/setmeup
 
 # Clean compiled resources and dependencies
 clean:
@@ -25,8 +26,12 @@ run: build
 	-cp -r ../core/lib/. ./node_modules/strautomator-core/lib/
 	node index.js
 
-# Deploy web and functions to production (by creating a new tag)
-deploy-git:
-	$(MAKE) -C .. deploy-git
+# Encrypt settings.
+encrypt:
+	$(SETMEUP) encrypt ./settings.secret.json
+
+# Decrypt settings.
+decrypt:
+	$(SETMEUP) decrypt ./settings.secret.json
 
 .PHONY: build
