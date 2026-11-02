@@ -15,7 +15,8 @@ const getDevAllowedHosts = (): string[] => {
         try {
             urls.push(loadFile(file, true).app?.url)
         } catch (ex) {
-            console.warn(`Could not read app.url from ${file}: ${ex.message}`)
+            // Do not log the error message, it might expose parts of secret values.
+            console.warn(`Could not read app.url from ${file}`)
         }
     }
 

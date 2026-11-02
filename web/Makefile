@@ -34,4 +34,4 @@ encrypt:
 decrypt:
 	$(SETMEUP) decrypt ./settings.secret.json
 
-.PHONY: build
+.PHONY: build encrypt decrypt
