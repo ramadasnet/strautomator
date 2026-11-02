@@ -97,9 +97,9 @@
         "backoffInterval": 500,
         // Retry axios requests after 1.1 seconds. Value set in milliseconds.
         "retryInterval": 1100,
-        // Default timeout of 45 seconds for axios requests, to stay under the
+        // Default timeout of 110 seconds for axios requests, to stay under the
         // 120 seconds limit of the underlying Cloud Run service. Value in milliseconds.
-        "timeout": 45000,
+        "timeout": 110000,
         // Timeout of 10 minutes for large file downloads (ie. affiliate product feeds).
         // Value in milliseconds.
         "downloadTimeout": 600000
