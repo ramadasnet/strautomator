@@ -96,6 +96,9 @@ export const axiosRequest = async (options: AxiosConfig): Promise<AxiosResponse 
         if (ex.config?.auth) {
             delete ex.config.auth
         }
+        if (ex.config?.url) {
+            ex.config.url = ex.config.url.split("?")[0]
+        }
         delete ex.request
         if (ex.response?.request) {
             ex.response.request = null
@@ -165,7 +168,7 @@ export const axiosRequest = async (options: AxiosConfig): Promise<AxiosResponse 
                 return res.status == 204 && !res.data ? true : options.returnResponse ? res : res.data
             } catch (innerEx) {
                 scrubError(innerEx)
-                if (!innerEx.url) innerEx.url = options.url
+                if (!innerEx.url) innerEx.url = options.url.split("?")[0]
                 if (isTimeout) innerEx.isTimeout = true
                 logger.warn("Axios.axiosRequest", options.method, logUrl, ex, "Failed twice, will not retry")
 
@@ -173,7 +176,7 @@ export const axiosRequest = async (options: AxiosConfig): Promise<AxiosResponse 
             }
         }
 
-        if (!ex.url) ex.url = options.url
+        if (!ex.url) ex.url = options.url.split("?")[0]
         if (isTimeout) ex.isTimeout = true
         throw ex
     }
