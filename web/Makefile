@@ -1,4 +1,4 @@
-TYPEDOC:= ./node_modules/.bin/typedoc
+TSC:= ./node_modules/.bin/tsc
 
 # Clean compiled resources and dependencies
 clean:
@@ -7,32 +7,9 @@ clean:
 	rm -rf ./node_modules
 	rm -f package-lock.json
 
-# Clean GIT tags.
-clean-tags:
-	git tag | xargs git tag -d
-	git fetch -t
-
-# Generate TypeScript docs
-docs:
-	rm -rf ./docs/assets
-	rm -rf ./docs/classes
-	rm -rf ./docs/interfaces
-	rm -rf ./docs/modules
-	$(TYPEDOC) --disableOutputCheck
-
 # Compile and build resources
 build:
 	npm run build
-
-# Docker build (from the repo root, as it depends on the local core).
-docker-build:
-	$(MAKE) -C .. docker-build
-
-# Run the app locally (dev server with hot reload)
-run:
-	-cp -r ../core/settings*.json ./node_modules/strautomator-core/
-	-cp -r ../core/lib/. ./node_modules/strautomator-core/lib/
-	npm run dev
 
 # Update dependencies and set new version
 update:
@@ -42,13 +19,10 @@ update:
 	npm install
 	-npm audit fix
 
-# Deploy to Google App Engine
-deploy-app-engine:
-	npm run build
-	gcloud app deploy app.yaml
+# Run the app locally (dev server with hot reload)
+run:
+	-cp -r ../core/settings*.json ./node_modules/strautomator-core/
+	-cp -r ../core/lib/. ./node_modules/strautomator-core/lib/
+	npm run dev
 
-# Deploy web and functions to production (by creating a new tag)
-deploy-git:
-	$(MAKE) -C .. deploy-git
-
-.PHONY: docs
+.PHONY: build

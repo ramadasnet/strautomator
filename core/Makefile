@@ -1,6 +1,5 @@
 MOCHA:= ./node_modules/.bin/mocha
 ISTANBUL:= ./node_modules/.bin/nyc
-TYPEDOC:= ./node_modules/.bin/typedoc
 TSC:= ./node_modules/.bin/tsc
 SETMEUP:= ./node_modules/.bin/setmeup
 
@@ -9,14 +8,6 @@ clean:
 	rm -rf ./lib
 	rm -rf ./node_modules
 	rm -f package-lock.json
-
-# Generate TypeScript docs
-docs:
-	rm -rf ./docs/assets
-	rm -rf ./docs/classes
-	rm -rf ./docs/interfaces
-	rm -rf ./docs/modules
-	$(TYPEDOC) --disableOutputCheck
 
 # Compile TypeScript to JS
 build:
@@ -48,4 +39,4 @@ encrypt:
 decrypt:
 	$(SETMEUP) decrypt ./settings.secret.json
 
-.PHONY: docs test
+.PHONY: build test
