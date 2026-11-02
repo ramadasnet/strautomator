@@ -223,6 +223,12 @@ export class StravaAPI {
     revokeToken = async (userId: string, accessToken: string, refreshToken?: string): Promise<void> => {
         try {
             if (!accessToken) {
+                // Accounts holding only a refresh token still get deauthorized.
+                if (refreshToken) {
+                    const tokens = await this.refreshToken(refreshToken, null, true)
+                    return await this.revokeToken(userId, tokens.accessToken)
+                }
+
                 logger.warn("Strava.revokeToken", `User ${userId}`, "No access token, can't deauthorize")
                 return
             }

@@ -151,6 +151,29 @@ describe("Strava API", () => {
         await stravaApi.revokeToken("user1", "token-revoked", "refresh-token-revoked")
     })
 
+    it("refreshes the token when only a refresh token is available", async () => {
+        requests.length = 0
+        handler = (req, res) => {
+            if (req.url == "/oauth/token") {
+                res.writeHead(200, {"Content-Type": "application/json"})
+                res.end(JSON.stringify({access_token: "token-from-refresh", refresh_token: "refresh-token-new", expires_at: 9999999999}))
+            } else {
+                res.writeHead(200, {"Content-Type": "application/json"})
+                res.end("{}")
+            }
+        }
+
+        await stravaApi.revokeToken("user1", null, "refresh-token-old")
+
+        const tokenCalls = callsTo("/oauth/token")
+        assert.equal(tokenCalls.length, 1)
+        assert.equal(params(tokenCalls[0]).get("refresh_token"), "refresh-token-old")
+
+        const revoke = callsTo("/oauth/revoke")
+        assert.equal(revoke.length, 1)
+        assert.equal(params(revoke[0]).get("token"), "token-from-refresh")
+    })
+
     it("scrubs tokens and secrets from request errors", async () => {
         requests.length = 0
         respond(401, {message: "Authorization Error"})
@@ -158,7 +181,7 @@ describe("Strava API", () => {
         try {
             await axiosRequest({
                 method: "POST",
-                url: `http://127.0.0.1:${server.address().port}/oauth/revoke`,
+                url: `http://127.0.0.1:${server.address().port}/oauth/revoke?api_key=secret-123`,
                 headers: {Authorization: "Basic dG9rZW4=", "Content-Type": "application/x-www-form-urlencoded"},
                 data: "token=token-abc",
                 timeout: 3000
@@ -168,7 +191,9 @@ describe("Strava API", () => {
             assert.equal(ex.statusCode, 401)
             assert.equal(ex.config.headers.Authorization, undefined)
             assert.equal(ex.config.data, undefined)
+            assert.equal(ex.config.url.includes("secret-123"), false)
             assert.equal(JSON.stringify(ex).includes("token-abc"), false)
+            assert.equal(JSON.stringify(ex).includes("secret-123"), false)
             assert.equal(JSON.stringify(ex).includes("dG9rZW4"), false)
         }
     })
