@@ -71,7 +71,6 @@ export const notifyUsage = async (user: UserData, component: GearWearComponent, 
                 usage: Math.round(usage),
                 alertDetails: alertDetails.join(", "),
                 resetLink: `${settings.app.url}gear/edit?id=${gear.id}&reset=${encodeURIComponent(compName)}`,
-                affiliateLink: `${settings.affiliates.server.url}s/${compName.toLowerCase()}?rn=1&from=${encodeURIComponent(settings.app.title)}`,
                 tips: component.name.toLowerCase().replace(/ /g, "")
             }
 

@@ -330,10 +330,6 @@ Then replace its contents with the **minimal working configuration** below. It e
       "gdpr": {"name": "my-strautomator-gdpr"}
     }
   },
-  // Skip the affiliate links server (strautomator.com only).
-  "affiliates": {
-    "server": {"url": null}
-  },
   // Disable optional modules that stop startup when their keys are missing.
   // Remove a line once you have configured that service.
   "paypal": {"disabled": true},
@@ -356,8 +352,6 @@ Then replace its contents with the **minimal working configuration** below. It e
 ```
 
 > **Note on Paddle:** to disable Paddle, use the key **`paddlewrapper`**, not `paddle`. A module's `disabled` flag is looked up by its class name in lowercase, and the Paddle module class is `PaddleWrapper`. Its API keys still go under `paddle.api.*` (`paddle.api.key` and `paddle.webhookId` are both mandatory).
-
-> **Known cosmetic issue:** with `affiliates.server.url` set to `null`, GearWear notification emails contain a broken affiliate link. Nothing else is affected.
 
 To enable a service later, remove its `disabled` line and add its keys. For example, for email through Amazon SES:
 

@@ -27,14 +27,9 @@ interface AffiliateLink {
 }
 
 const affiliates: AffiliateLink[] = [
-    {id: "365rider", title: "365 Rider", url: "https://links.strautomator.com/l/365rider"},
     {id: "aliexpress", title: "AliExpress", url: "https://links.strautomator.com/l/aliexpress-cycling-components"},
-    {id: "decathlon", title: "Decathlon", url: "https://links.strautomator.com/l/decathlon", country: ["AT", "DE", "GB", "IT", "IE", "UK"]},
     {id: "ican", title: "ICAN", url: "https://links.strautomator.com/l/ican"},
-    {id: "nextdns", title: "NextDNS", url: "https://links.strautomator.com/l/nextdns"},
-    {id: "ribble", title: "Ribble", url: "https://links.strautomator.com/l/ribble", country: ["AT", "DE", "GB", "IE", "IM", "UK"]},
-    {id: "tredz", title: "Tredz", url: "https://links.strautomator.com/l/tredz", country: ["GB", "IE", "UK"]},
-    {id: "authenticfeet", title: "Authentic Feet", url: "https://links.strautomator.com/l/authenticfeet", country: ["BR"]}
+    {id: "nextdns", title: "NextDNS", url: "https://links.strautomator.com/l/nextdns"}
 ]
 
 const store = useMainStore()
