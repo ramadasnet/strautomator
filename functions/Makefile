@@ -1,4 +1,5 @@
 TSC:= ./node_modules/.bin/tsc
+SETMEUP:= ./node_modules/.bin/setmeup
 
 # Clean compiled resources and dependencies
 clean:
