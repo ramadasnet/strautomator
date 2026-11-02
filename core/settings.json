@@ -720,11 +720,9 @@
             // Maximum duration allowed to process a single activity, in seconds.
             // Timed-out activities stay queued and are retried on the next runs.
             "activityTimeout": 60,
-            // Maximum duration of a single queue processing run, in seconds.
-            // Queued activities that can't start within this budget are left for the next run.
-            "maxRunDuration": 50,
-            // Activities still flagged as processing after this many seconds are
-            // considered stuck (ie. from a crashed run) and picked up again.
+            // Maximum duration of a single queue processing run, in seconds. An activity only starts if it can finish (activityTimeout) within this budget, the rest is left for the next run.
+            "maxRunDuration": 90,
+            // Activities flagged as processing for longer than this (since processing started) are considered stuck or timed out and picked up again. Value in seconds.
             "processingTimeout": 1800
         },
         "records": {

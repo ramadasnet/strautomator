@@ -42,12 +42,18 @@ export default defineEventHandler(async (event) => {
                     const processed = await strava.activityProcessing.processActivityWithTimeout(user, {id: activityId})
                     if (processed && !processed.error) {
                         user.dateLastProcessedActivity = now
+                    } else if (!processed) {
+                        try {
+                            await strava.activityProcessing.deleteQueuedActivity({id: activityId, userId: user.id} as any)
+                        } catch (deleteEx) {
+                            logger.warn("Routes.strava", `Failed to delete queued activity ${activityId} after realtime processing`, deleteEx)
+                        }
                     }
                 } catch (ex) {
                     // Timed out? Queue the activity so it's retried by the next queue run instead of being dropped.
                     if (ex.isTimeout) {
                         logger.warn("Routes.strava", `Activity ${activityId} processing timed out, queueing for retry`)
-                        await strava.activityProcessing.queueActivity(user, activityId, false, ex.message)
+                        await strava.activityProcessing.queueActivity(user, activityId, false, ex.message, true)
                     } else {
                         throw ex
                     }

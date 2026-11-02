@@ -510,8 +510,9 @@ export class StravaActivityProcessing {
      * @param activityId The activity's unique ID.
      * @param batch Queued as part of a batch processing for old activities?
      * @param error Queued because of a processing error?
+     * @param processing Flag the activity as processing (lease), so the queue only retries it once the processing timeout expires.
      */
-    queueActivity = async (user: UserData, activityId: number, batch?: boolean, error?: any): Promise<void> => {
+    queueActivity = async (user: UserData, activityId: number, batch?: boolean, error?: any, processing?: boolean): Promise<void> => {
         if (user.suspended) {
             logger.warn("Strava.queueActivity", logHelper.user(user), `User suspended, won't process activity ${activityId}`)
             return
@@ -528,7 +529,6 @@ export class StravaActivityProcessing {
             activity.id = activityId
             activity.userId = user.id
             activity.queued = true
-            activity.processing = false
             activity.dateQueued = activity.dateQueued || new Date()
 
             // Part of a batch processing? Flag it.
@@ -539,6 +539,11 @@ export class StravaActivityProcessing {
             // Previously failed due to an error? Set it.
             if (error) {
                 activity.error = error
+            }
+
+            if (processing) {
+                activity.processing = true
+                activity.dateProcessing = new Date()
             }
 
             await database.set("activities", activity, activityId.toString())
@@ -604,9 +609,9 @@ export class StravaActivityProcessing {
             const beforeDate = now.subtract(settings.strava.processingQueue.delayedSeconds, "seconds").toDate()
             const queuedActivities = await this.getQueuedActivities(beforeDate, batchSize)
 
-            // Filter activities that are not currently being processed, or that have been queued for
-            // longer than the processing timeout (ie. stuck from a crashed run) regardless of the flag.
-            const activities = queuedActivities.filter((a) => !a.processing || a.dateQueued < processingCutDate)
+            // Filter activities that are not currently being processed, or whose processing lease has
+            // expired (falling back to dateQueued for older entries).
+            const activities = queuedActivities.filter((a) => !a.processing || (a.dateProcessing || a.dateQueued) < processingCutDate)
             let processedCount = 0
 
             // No activities to be processed? Stop here.
@@ -620,14 +625,14 @@ export class StravaActivityProcessing {
             const skipLog = skipped > 0 ? `, skipping ${skipped} already processing` : ""
             logger.info("Strava.processQueuedActivities", logBatchSize, `Will process ${activities.length} activities${skipLog}`)
 
-            // First we set the processing flag on the queued activities to avoid double-processing.
+            // First we set the processing lease on queued activities to avoid double-processing.
             for (let activity of activities) {
                 try {
                     if (_.isNil(activity.retryCount)) {
                         activity.retryCount = 0
                     }
 
-                    await database.merge("activities", {id: activity.id, processing: true})
+                    await database.merge("activities", {id: activity.id, processing: true, dateProcessing: new Date()})
                 } catch (innerEx) {
                     logger.error("Strava.processQueuedActivities", `Failed to set the processing flag for activity ${activity.id} from user ${activity.userId}`, innerEx)
                 }
@@ -640,7 +645,7 @@ export class StravaActivityProcessing {
                 const pActivity = activities[activityIndex]
 
                 // Out of budget? Leftover activities are picked up by the next run.
-                if (dayjs().isAfter(runDeadline)) {
+                if (runDeadline.diff(dayjs()) < activityTimeoutMs) {
                     logger.warn("Strava.processQueuedActivities", logBatchSize, `Max run duration exceeded, ${activities.length - activityIndex} activities left for the next run`)
                     break
                 }
@@ -667,6 +672,9 @@ export class StravaActivityProcessing {
                     if (pActivity.retryCount >= settings.strava.processingQueue.retry) {
                         logger.warn("Strava.processQueuedActivities", `Failed to process queued activity ${pActivity.id} from user ${pActivity.userId} too many times`)
                         await this.deleteQueuedActivity(pActivity)
+                    } else if (activityEx.isTimeout) {
+                        logger.warn("Strava.processQueuedActivities", `Activity ${pActivity.id} from user ${pActivity.userId} timed out, will retry after the processing timeout`)
+                        await database.merge("activities", {id: pActivity.id, processing: true, dateProcessing: new Date(), retryCount: pActivity.retryCount + 1})
                     } else {
                         logger.warn("Strava.processQueuedActivities", `Failed to process queued activity ${pActivity.id} from user ${pActivity.userId}, will retry`)
                         await database.merge("activities", {id: pActivity.id, processing: false, retryCount: pActivity.retryCount + 1})
@@ -676,13 +684,15 @@ export class StravaActivityProcessing {
 
             // Reset the processing flag on activities that were not attempted in this
             // run, so they are picked up straight away by the next one.
-            for (let pActivity of activities.slice(activityIndex)) {
-                try {
-                    await database.merge("activities", {id: pActivity.id, processing: false})
-                } catch (innerEx) {
-                    logger.error("Strava.processQueuedActivities", `Failed to reset the processing flag for activity ${pActivity.id} from user ${pActivity.userId}`, innerEx)
-                }
-            }
+            await Promise.all(
+                activities.slice(activityIndex).map(async (pActivity) => {
+                    try {
+                        await database.merge("activities", {id: pActivity.id, processing: false})
+                    } catch (innerEx) {
+                        logger.error("Strava.processQueuedActivities", `Failed to reset the processing flag for activity ${pActivity.id} from user ${pActivity.userId}`, innerEx)
+                    }
+                })
+            )
 
             if (processedCount > 0) {
                 logger.info("Strava.processQueuedActivities", logBatchSize, `Processed ${processedCount} out of ${activities.length} queued activities`)

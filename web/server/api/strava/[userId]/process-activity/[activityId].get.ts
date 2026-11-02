@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
         } catch (ex) {
             // Timed out? Queue the activity so it's retried by the next queue run instead of being dropped.
             if (ex.isTimeout) {
-                await strava.activityProcessing.queueActivity(user, parseInt(activityId as string), false, ex.message)
+                await strava.activityProcessing.queueActivity(user, parseInt(activityId as string), false, ex.message, true)
                 return renderJson(event, {processed: false, queued: true})
             }
             throw ex
