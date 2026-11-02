@@ -375,6 +375,8 @@ export interface StravaProcessedActivity {
     processing?: boolean
     /** When the current processing attempt started (processing lease). */
     dateProcessing?: Date
+    /** Pending webhook action (update or delete) to be replayed by the queue instead of a full processing. */
+    webhookAction?: string
     /** How many times the service tried processing this activity? */
     retryCount?: number
     /** List of new records. */

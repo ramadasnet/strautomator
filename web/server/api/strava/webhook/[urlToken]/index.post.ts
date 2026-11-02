@@ -60,23 +60,18 @@ export default defineEventHandler(async (event) => {
             timeout: settings.strava.processingQueue.activityTimeout * 1000 + 15000
         }
 
-        // New activities are queued before acknowledging the webhook, so they are still processed
-        // by the queue if the realtime callback below fails. Successful processing replaces the queue entry.
-        if (objAspect == "create") {
-            try {
-                const user = await users.getById(userId)
-                if (user) await strava.activityProcessing.queueActivity(user, parseInt(objId))
-            } catch (queueEx) {
-                logger.error("Routes.strava", event.req.method, event.url.pathname + event.url.search, `Failed to queue activity ${objId}`, queueEx)
-            }
+        // Webhook events are queued before acknowledging, so they are still handled by the queue
+        // if the realtime callback below fails. Creates are processed in full, while updates and
+        // deletes get their webhookAction replayed as the matching activity event.
+        try {
+            const user = await users.getById(userId)
+            if (user) await strava.activityProcessing.queueActivity(user, parseInt(objId), false, undefined, undefined, objAspect == "create" ? undefined : objAspect)
+        } catch (queueEx) {
+            logger.error("Routes.strava", event.req.method, event.url.pathname + event.url.search, `Failed to queue activity ${objId}`, queueEx)
         }
 
         axios(options).catch((err) => {
-            if (objAspect != "create" && err.code != "ECONNABORTED" && err.code != "ETIMEDOUT") {
-                axios(options).catch((retryErr) => logger.error("Routes.strava", event.req.method, event.url.pathname + event.url.search, "Activity callback endpoint failed again", retryErr.toString()))
-            } else {
-                logger.warn("Routes.strava", event.req.method, event.url.pathname + event.url.search, "Activity callback endpoint failed", objAspect == "create" ? "activity stays queued" : "", err.toString())
-            }
+            logger.warn("Routes.strava", event.req.method, event.url.pathname + event.url.search, `Activity callback endpoint failed, ${objAspect} action stays queued`, err.toString())
         })
         return renderJson(event, {ok: true})
     } catch (ex) {

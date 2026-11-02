@@ -511,8 +511,9 @@ export class StravaActivityProcessing {
      * @param batch Queued as part of a batch processing for old activities?
      * @param error Queued because of a processing error?
      * @param processing Flag the activity as processing (lease), so the queue only retries it once the processing timeout expires.
+     * @param webhookAction Pending webhook action (update or delete) to be replayed by the queue instead of a full processing.
      */
-    queueActivity = async (user: UserData, activityId: number, batch?: boolean, error?: any, processing?: boolean): Promise<void> => {
+    queueActivity = async (user: UserData, activityId: number, batch?: boolean, error?: any, processing?: boolean, webhookAction?: string): Promise<void> => {
         if (user.suspended) {
             logger.warn("Strava.queueActivity", logHelper.user(user), `User suspended, won't process activity ${activityId}`)
             return
@@ -544,6 +545,13 @@ export class StravaActivityProcessing {
             if (processing) {
                 activity.processing = true
                 activity.dateProcessing = new Date()
+            }
+
+            // Pending webhook action? Set it, or clear any stale one.
+            if (webhookAction) {
+                activity.webhookAction = webhookAction
+            } else {
+                delete activity.webhookAction
             }
 
             await database.set("activities", activity, activityId.toString())
@@ -656,6 +664,14 @@ export class StravaActivityProcessing {
                     }
                     if (!usersCache[pActivity.userId]) {
                         logger.warn("Strava.processQueuedActivities", `User ${pActivity.userId} not found, deleting queued activity ${pActivity.id}`)
+                        await this.deleteQueuedActivity(pActivity)
+                        continue
+                    }
+
+                    // Pending webhook action (update / delete)? Replay the matching event
+                    // instead of a full processing, then remove it from the queue.
+                    if (pActivity.webhookAction == "update" || pActivity.webhookAction == "delete") {
+                        eventManager.emit(`Strava.activity${pActivity.webhookAction == "update" ? "Updated" : "Deleted"}`, usersCache[pActivity.userId], pActivity.id)
                         await this.deleteQueuedActivity(pActivity)
                         continue
                     }
