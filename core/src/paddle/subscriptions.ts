@@ -243,8 +243,12 @@ export class PaddleSubscriptions {
                 throw new Error("Failed to create subscription being updated")
             }
             if (!user) {
-                // Without a resolved user, only proceed if the stored subscription
-                // belongs to the same Paddle customer referenced by the event.
+                // Without a resolved user, only cancellations are applied (they are final on Paddle,
+                // so a late or out of order delivery can't revert them), and only if the stored
+                // subscription belongs to the same Paddle customer referenced by the event.
+                if (data.status != "canceled") {
+                    throw new Error(`User with Paddle ID ${data.customerId} not found`)
+                }
                 if (!sub.customerId || sub.customerId != data.customerId) {
                     throw new Error(`Subscription ${sub.id} belongs to a different customer (${sub.customerId} / ${data.customerId})`)
                 }
@@ -266,6 +270,15 @@ export class PaddleSubscriptions {
             }
             if (this.setPaymentDates(updatedSub, data)) {
                 hasChanges = true
+            }
+
+            // Cancelled subscriptions have no future payments.
+            if (status == "CANCELLED") {
+                delete updatedSub.dateNextPayment
+                if (sub.dateNextPayment) {
+                    updatedSub.dateNextPayment = FieldValue.delete() as any
+                    hasChanges = true
+                }
             }
 
             _.assign(sub, updatedSub)

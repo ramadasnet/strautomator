@@ -14,7 +14,9 @@ export const paddleEventInfo = (body?: string | Buffer): Record<string, string> 
     const info: Record<string, string> = {}
     try {
         const parsed = JSON.parse(body?.toString() || "")
-        const fields = {eventType: parsed?.event_type, eventId: parsed?.event_id, subscriptionId: parsed?.data?.id}
+        const eventType = typeof parsed?.event_type == "string" ? parsed.event_type : ""
+        const subscriptionId = eventType.startsWith("subscription.") ? parsed.data?.id : eventType.startsWith("transaction.") ? parsed.data?.subscription_id : null
+        const fields = {eventType: eventType, eventId: parsed?.event_id, subscriptionId: subscriptionId}
         for (const [key, value] of Object.entries(fields)) {
             // Restrict to identifier characters, as the body is not signature-verified yet.
             const cleaned = typeof value == "string" ? value.replace(/[^\w.:-]/g, "").substring(0, 64) : ""
