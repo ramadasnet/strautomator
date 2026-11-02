@@ -424,7 +424,14 @@
             // Maximum concurrent requests per instance.
             "maxConcurrent": 4,
             // Maximum requests per minute per instance.
-            "maxPerMinute": 100
+            "maxPerMinute": 100,
+            // Stop sending requests for a while after this many consecutive failures,
+            // so batch processing won't keep hammering a broken endpoint.
+            "failureThreshold": 5,
+            // Initial circuit breaker pause in seconds, doubled after each new outage.
+            "failureCooldown": 60,
+            // Maximum circuit breaker pause in seconds.
+            "failureCooldownMax": 900
         },
         // Models used for each of the AI providers that users can select as their preference.
         // Providers not listed here will use the default model set on the OpenRouter account.
