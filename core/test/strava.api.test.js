@@ -29,7 +29,10 @@ describe("Strava API", () => {
         })
         await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve))
         const baseUrl = `http://127.0.0.1:${server.address().port}`
-        settings.strava.api.revokeUrl = `${baseUrl}/oauth/deauthorize`
+        settings.strava.api.clientId = "client-id-test"
+        settings.strava.api.clientSecret = "client-secret-test"
+        settings.strava.api.revokeUrl = `${baseUrl}/oauth/revoke`
+        settings.strava.api.deauthorizeUrl = `${baseUrl}/oauth/deauthorize`
         settings.strava.api.tokenUrl = `${baseUrl}/oauth/token`
     })
 
@@ -42,24 +45,52 @@ describe("Strava API", () => {
         }
     }
 
-    const deauthorized = () => requests.filter((r) => r.url == "/oauth/deauthorize")
+    const callsTo = (path) => requests.filter((r) => r.url == path)
+    const params = (req) => new URLSearchParams(req.body)
 
-    it("posts the access token to the deauthorize endpoint", async () => {
+    it("posts the token to the revoke endpoint with client credentials", async () => {
         requests.length = 0
-        respond(200, {access_token: "token-abc"})
+        respond(200, {})
 
         await stravaApi.revokeToken("user1", "token-abc")
 
-        assert.equal(deauthorized().length, 1)
+        assert.equal(callsTo("/oauth/revoke").length, 1)
+        assert.equal(callsTo("/oauth/deauthorize").length, 0)
+
         const req = requests[0]
         assert.equal(req.method, "POST")
         assert.equal(req.headers["content-type"], "application/x-www-form-urlencoded")
-        assert.equal(req.headers["authorization"], "Bearer token-abc")
 
-        const params = new URLSearchParams(req.body)
-        assert.equal(params.get("access_token"), "token-abc")
-        assert.equal(params.get("client_id"), null)
-        assert.equal(params.get("client_secret"), null)
+        const credentials = Buffer.from(req.headers["authorization"].replace("Basic ", ""), "base64").toString()
+        assert.equal(credentials, "client-id-test:client-secret-test")
+
+        assert.equal(params(req).get("token"), "token-abc")
+        assert.equal(params(req).get("token_type_hint"), "access_token")
+    })
+
+    it("falls back to the deauthorize endpoint when revoke fails", async () => {
+        requests.length = 0
+        handler = (req, res) => {
+            if (req.url == "/oauth/revoke") {
+                res.writeHead(400, {"Content-Type": "application/json"})
+                res.end(JSON.stringify({message: "Bad Request", errors: [{resource: "Application", field: "client_secret", code: "invalid"}]}))
+            } else {
+                res.writeHead(200, {"Content-Type": "application/json"})
+                res.end(JSON.stringify({access_token: "token-abc"}))
+            }
+        }
+
+        await stravaApi.revokeToken("user1", "token-abc")
+
+        assert.equal(callsTo("/oauth/revoke").length >= 1, true)
+        const deauthorize = callsTo("/oauth/deauthorize")
+        assert.equal(deauthorize.length, 1)
+
+        const req = deauthorize[0]
+        assert.equal(req.headers["authorization"], "Bearer token-abc")
+        assert.equal(params(req).get("access_token"), "token-abc")
+        assert.equal(params(req).get("client_id"), null)
+        assert.equal(params(req).get("client_secret"), null)
     })
 
     it("resolves when the token was already revoked", async () => {
@@ -87,29 +118,30 @@ describe("Strava API", () => {
     it("refreshes the token and retries when the first call fails", async () => {
         requests.length = 0
         handler = (req, res) => {
-            if (req.url == "/oauth/deauthorize") {
-                if (deauthorized().length == 1) {
-                    res.writeHead(401, {"Content-Type": "application/json"})
-                    res.end(JSON.stringify({message: "Authorization Error"}))
-                } else {
-                    res.writeHead(200, {"Content-Type": "application/json"})
-                    res.end(JSON.stringify({access_token: "token-refreshed"}))
-                }
-            } else {
+            if (req.url == "/oauth/revoke") {
+                res.writeHead(400, {"Content-Type": "application/json"})
+                res.end(JSON.stringify({message: "Bad Request"}))
+            } else if (req.url == "/oauth/deauthorize" && callsTo("/oauth/deauthorize").length <= 2) {
+                res.writeHead(401, {"Content-Type": "application/json"})
+                res.end(JSON.stringify({message: "Authorization Error"}))
+            } else if (req.url == "/oauth/token") {
                 res.writeHead(200, {"Content-Type": "application/json"})
                 res.end(JSON.stringify({access_token: "token-refreshed", refresh_token: "refresh-token-new", expires_at: 9999999999}))
+            } else {
+                res.writeHead(200, {"Content-Type": "application/json"})
+                res.end("{}")
             }
         }
 
         await stravaApi.revokeToken("user1", "token-stale", "refresh-token-old")
 
-        const tokenCalls = requests.filter((r) => r.url == "/oauth/token")
+        const tokenCalls = callsTo("/oauth/token")
         assert.equal(tokenCalls.length, 1)
-        assert.equal(new URLSearchParams(tokenCalls[0].body).get("refresh_token"), "refresh-token-old")
+        assert.equal(params(tokenCalls[0]).get("refresh_token"), "refresh-token-old")
 
-        const revokes = deauthorized()
-        assert.equal(revokes.length, 2)
-        assert.equal(new URLSearchParams(revokes[1].body).get("access_token"), "token-refreshed")
+        const deauthorize = callsTo("/oauth/deauthorize")
+        const lastDeauthorize = deauthorize[deauthorize.length - 1]
+        assert.equal(params(lastDeauthorize).get("access_token"), "token-refreshed")
     })
 
     it("resolves when the refresh also fails with an authorization error", async () => {
@@ -126,9 +158,9 @@ describe("Strava API", () => {
         try {
             await axiosRequest({
                 method: "POST",
-                url: `http://127.0.0.1:${server.address().port}/oauth/deauthorize`,
-                headers: {Authorization: "Bearer token-abc", "Content-Type": "application/x-www-form-urlencoded"},
-                data: "access_token=token-abc",
+                url: `http://127.0.0.1:${server.address().port}/oauth/revoke`,
+                headers: {Authorization: "Basic dG9rZW4=", "Content-Type": "application/x-www-form-urlencoded"},
+                data: "token=token-abc",
                 timeout: 3000
             })
             assert.fail("Request should have failed")
@@ -137,6 +169,7 @@ describe("Strava API", () => {
             assert.equal(ex.config.headers.Authorization, undefined)
             assert.equal(ex.config.data, undefined)
             assert.equal(JSON.stringify(ex).includes("token-abc"), false)
+            assert.equal(JSON.stringify(ex).includes("dG9rZW4"), false)
         }
     })
 })

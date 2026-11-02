@@ -214,7 +214,8 @@ export class StravaAPI {
     }
 
     /**
-     * Revoke the passed access token, using Strava's deauthorize flow.
+     * Revoke the passed access token, using Strava's token revocation flow.
+     * Falls back to the legacy deauthorize flow when the revoke endpoint fails.
      * @param userId ID of the token's owner.
      * @param accessToken Access token to be deauthorized.
      * @param refreshToken Optional refresh token, in case the access token fails.
@@ -226,21 +227,36 @@ export class StravaAPI {
                 return
             }
 
-            // The token goes on the POST body, as documented by Strava's deauthorize flow.
-            // The endpoint does not take the client_id and client_secret credentials.
-            const reqOptions: AxiosConfig = {
-                method: "POST",
-                url: settings.strava.api.revokeUrl,
-                headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                    "Content-Type": "application/x-www-form-urlencoded"
-                },
-                data: new URLSearchParams({access_token: accessToken}).toString(),
-                timeout: settings.oauth.tokenTimeout
-            }
+            try {
+                // Preferred flow: RFC 7009 revocation, authenticated with the client
+                // credentials via Basic auth, with the token on the form body.
+                const credentials = Buffer.from(`${settings.strava.api.clientId}:${settings.strava.api.clientSecret}`).toString("base64")
+                await axiosRequest({
+                    method: "POST",
+                    url: settings.strava.api.revokeUrl,
+                    headers: {
+                        Authorization: `Basic ${credentials}`,
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    },
+                    data: new URLSearchParams({token: accessToken, token_type_hint: "access_token"}).toString(),
+                    timeout: settings.oauth.tokenTimeout
+                })
+            } catch (revokeEx) {
+                // Fallback: legacy deauthorize flow, which only needs the access token.
+                this.extractTokenError(revokeEx)
+                logger.debug("Strava.revokeToken", `User ${userId}`, "Revoke endpoint failed, trying deauthorize", revokeEx.friendlyMessage || revokeEx.message)
 
-            // Post data to Strava.
-            await axiosRequest(reqOptions)
+                await axiosRequest({
+                    method: "POST",
+                    url: settings.strava.api.deauthorizeUrl,
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    },
+                    data: new URLSearchParams({access_token: accessToken}).toString(),
+                    timeout: settings.oauth.tokenTimeout
+                })
+            }
 
             logger.info("Strava.revokeToken", `User ${userId}`, `Token deauthorized`)
         } catch (ex) {
