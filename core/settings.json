@@ -60,6 +60,27 @@
         // Only accept connections coming via Cloudflare by default.
         "requireCloudflare": true
     },
+    // Afiliate settings (also used for the Country Linkify module).
+    "affiliates": {
+        "app": {
+            "homeUrl": "https://strautomator.com/billing/affiliates",
+            "title": "Strautomator"
+        },
+        "country": {
+            "cacheDuration": 900,
+            "default": "us",
+            "es": ["mt", "pt"],
+            "de": ["at", "be", "ch", "cz", "dk", "ee", "gi", "fi", "fr", "hu", "ie", "it", "nl", "no", "pl", "se", "sk"],
+            "uk": ["gb"]
+        },
+        "images": {
+            "path": "./static/images/affiliates/"
+        },
+        "server": {
+            "basePath": "/affiliates/",
+            "url": "https://links.strautomator.com/"
+        }
+    },
     "announcements": {
         // Active announcements should be cached for up to 30 minutes.
         "cacheDuration": 1800
