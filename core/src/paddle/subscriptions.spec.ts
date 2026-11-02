@@ -141,6 +141,22 @@ const run = async () => {
         assert(thrown && thrown.message.includes("not found"), "event with no user and no subscription throws")
     }
 
+    // Without a resolved user, a subscription linked to a different customer is
+    // never touched: the event is rejected instead of mutating the wrong record.
+    {
+        const state = {userByPaddle: null, userById: null, userByPrevious: null, sub: {...activeSub(), customerId: "ctm_02"}}
+        stub(state)
+
+        let thrown: Error
+        try {
+            await paddleSubscriptions.onSubscriptionUpdated(canceledEvent("user_01"))
+        } catch (ex) {
+            thrown = ex
+        }
+        assert(thrown && thrown.message.includes("different customer"), "mismatched customer on missing user throws")
+        assert(state.sub.status == "ACTIVE", "mismatched subscription is left untouched")
+    }
+
     // User found via previous ID (deleted and re-created account): the Paddle
     // customer link is repaired and the subscription is moved to the new user.
     {

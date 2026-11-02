@@ -254,6 +254,11 @@ export class PaddleSubscriptions {
                 throw new Error("Failed to create subscription being updated")
             }
             if (!user) {
+                // Without a resolved user, only proceed if the stored subscription
+                // belongs to the same Paddle customer referenced by the event.
+                if (sub.customerId && data.customerId && sub.customerId != data.customerId) {
+                    throw new Error(`Subscription ${sub.id} belongs to a different customer (${sub.customerId} / ${data.customerId})`)
+                }
                 logger.warn("Paddle.onSubscriptionUpdated", logHelper.paddleEvent(entity), `User not found, updating subscription ${sub.id} anyway`)
             }
 
