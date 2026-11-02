@@ -63,7 +63,7 @@ export class PayPalWebhooks {
                 returnRepresentation: true,
                 data: {
                     url: api.webhookUrl,
-                    event_types: settings.paypal.api.webhookEvents
+                    event_types: settings.paypal.api.webhookEvents.map((name: string) => ({name}))
                 }
             }
 

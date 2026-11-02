@@ -1,4 +1,5 @@
 TSC:= ./node_modules/.bin/tsc
+SETMEUP:= ./node_modules/.bin/setmeup
 
 # Clean compiled resources and dependencies
 clean:
@@ -25,4 +26,12 @@ run:
 	-cp -r ../core/lib/. ./node_modules/strautomator-core/lib/
 	npm run dev
 
-.PHONY: build
+# Encrypt settings.
+encrypt:
+	$(SETMEUP) encrypt ./settings.secret.json
+
+# Decrypt settings.
+decrypt:
+	$(SETMEUP) decrypt ./settings.secret.json
+
+.PHONY: build encrypt decrypt

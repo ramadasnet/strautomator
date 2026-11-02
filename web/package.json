@@ -1,6 +1,6 @@
 {
     "name": "strautomator-web",
-    "version": "26.445.11628",
+    "version": "26.451.12243",
     "description": "Strautomator.com website.",
     "author": "Igor Ramadas",
     "license": "AGPL-3.0-only",
@@ -43,7 +43,7 @@
     "devDependencies": {
         "@types/lodash": "^4.17.27",
         "@types/node": "^26.6.6",
-        "sass-embedded": "^1.107.0",
+        "sass-embedded": "^1.107.1",
         "tsx": "^4.23.15",
         "typescript": "^7.0.2"
     },
