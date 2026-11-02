@@ -1,5 +1,6 @@
 import colors from "vuetify/util/colors"
 import fs from "node:fs"
+import {loadFile} from "setmeup/lib/utils.js"
 import {stopDevTunnel} from "./server/utils/tunnel.ts"
 
 /**
@@ -10,16 +11,11 @@ const getDevAllowedHosts = (): string[] => {
     const urls: string[] = [process.env.SMU_app_url]
 
     for (const file of ["settings.local.json", "settings.secret.json"]) {
+        if (!fs.existsSync(file)) continue
         try {
-            const content = fs.readFileSync(file, "utf8")
-            try {
-                urls.push(JSON.parse(content).app?.url)
-            } catch (ex) {
-                // Settings with comments are not valid JSON, so fallback to a regex.
-                urls.push(content.match(/"app"\s*:\s*\{[^}]*?"url"\s*:\s*"([^"]+)"/)?.[1])
-            }
+            urls.push(loadFile(file, true).app?.url)
         } catch (ex) {
-            // File not found, ignore.
+            console.warn(`Could not read app.url from ${file}: ${ex.message}`)
         }
     }
 
@@ -75,8 +71,7 @@ export default defineNuxtConfig({
                     innerHTML:
                         "@layer vuetify-core{@layer reset,base}@layer vuetify-components;@layer vuetify-overrides;@layer vuetify-utilities{@layer theme-base,typography,helpers,theme-background,theme-foreground}@layer vuetify-final{@layer transitions,trumps}"
                 }
-            ],
-            script: [{src: "https://cdn.paddle.com/paddle/v2/paddle.js", crossorigin: "anonymous"}]
+            ]
         }
     },
 
