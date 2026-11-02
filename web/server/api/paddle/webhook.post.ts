@@ -8,12 +8,12 @@ import logger from "anyhow"
 /**
  * Extract the event identifiers from a raw Paddle webhook payload, for logging purposes.
  * The full body must never be logged, as it contains personal customer data.
- * @param body The raw request body as a string.
+ * @param body The raw request body.
  */
-export const paddleEventInfo = (body?: string): Record<string, string> => {
+export const paddleEventInfo = (body?: string | Buffer): Record<string, string> => {
     const info: Record<string, string> = {}
     try {
-        const parsed = JSON.parse(body || "")
+        const parsed = JSON.parse(body?.toString() || "")
         const fields = {eventType: parsed?.event_type, eventId: parsed?.event_id, subscriptionId: parsed?.data?.id}
         for (const [key, value] of Object.entries(fields)) {
             // Restrict to identifier characters, as the body is not signature-verified yet.
@@ -30,13 +30,13 @@ export const paddleEventInfo = (body?: string): Record<string, string> => {
  * Process Paddle webhooks.
  */
 export default defineEventHandler(async (event) => {
+    // The body is kept out of the event context, so renderError() never logs it.
+    let rawBody: Buffer
     try {
-        const rawBody = await readRawBody(event)
-        event.context.requestBody = rawBody.toString()
+        rawBody = await readRawBody(event)
         await paddle.processWebhook(toCoreRequest(event, rawBody) as any)
     } catch (ex) {
-        // Log the event identifiers and the error, then clear the body so it never reaches the logs.
-        const info = paddleEventInfo(event.context.requestBody)
+        const info = paddleEventInfo(rawBody)
         event.context.requestBody = undefined
         logger.error("Routes.paddle", event.req.method, event.url.pathname + event.url.search, info, ex)
         if (ex instanceof WebError) return renderError(event, ex)
