@@ -62,8 +62,17 @@ export default defineEventHandler(async (event) => {
 
         axios(options).catch(() => {
             logger.warn("Routes.strava", event.req.method, event.url.pathname + event.url.search, "Activity callback endpoint failed, will try again")
-            axios(options).catch((err) => {
+            axios(options).catch(async (err) => {
                 logger.error("Routes.strava", event.req.method, event.url.pathname + event.url.search, "Activity callback endpoint failed again", err.toString())
+
+                // Both attempts failed? Queue the activity as a last resort, so it is
+                // still processed by the next queue run instead of being dropped.
+                try {
+                    const user = await users.getById(userId)
+                    if (user) await strava.activityProcessing.queueActivity(user, parseInt(objId), false, err.toString())
+                } catch (innerEx) {
+                    logger.error("Routes.strava", event.req.method, event.url.pathname + event.url.search, `Failed to queue activity ${objId} for user ${userId}`, innerEx)
+                }
             })
         })
         return renderJson(event, {ok: true})
