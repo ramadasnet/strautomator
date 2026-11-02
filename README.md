@@ -98,7 +98,7 @@ Everything runs on Google Cloud Build, using the [cloudbuild.yaml](cloudbuild.ya
 To release a new version to production, from an up-to-date `master` branch:
 
 ```sh
-make deploy-git
+make deploy
 ```
 
 This sets the new date-based version on the web and functions, commits it, creates a `vYY.WWD.1HHMM` tag and pushes it to GitHub.
