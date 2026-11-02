@@ -55,7 +55,9 @@ export default defineEventHandler(async (event) => {
             method: "GET",
             baseURL: settings.api.url || `${settings.app.url}api/`,
             url: `/strava/webhook/${settings.strava.api.urlToken}/${userId}/${objId}?action=${objAspect}&timestamp=${obj.event_time}`,
-            headers: {"User-Agent": `${settings.app.title} / ${packageJson.version}`}
+            headers: {"User-Agent": `${settings.app.title} / ${packageJson.version}`},
+            // Must outlast the per-activity processing timeout, but stay under the Cloud Run request limit.
+            timeout: settings.strava.processingQueue.activityTimeout * 1000 + 15000
         }
 
         axios(options).catch(() => {

@@ -81,6 +81,7 @@ export class OpenRouter implements AiProvider {
             const reqOptions: AxiosConfig = {
                 url: `${settings.openrouter.api.baseUrl}chat/completions`,
                 method: "POST",
+                timeout: settings.ai.timeout,
                 headers: {
                     Authorization: `Bearer ${settings.openrouter.api.key}`,
                     "X-Title": "Strautomator"

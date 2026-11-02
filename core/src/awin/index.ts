@@ -109,7 +109,7 @@ export class AWIN {
 
                 const minDate = dayjs().subtract(feedSettings.maxAgeDays, "days")
                 const url = jaul.data.replaceTags(feedSettings.listUrl, {publisherId: settings.awin.publisherId, key: feedSettings.key})
-                const res = await axiosRequest({url, responseType: "stream"})
+                const res = await axiosRequest({url, responseType: "stream", timeout: settings.axios.downloadTimeout})
                 const countryFeeds = {}
 
                 // Helper to parse individual rows from the CSV.
@@ -176,7 +176,7 @@ export class AWIN {
                     const feedId = urlParts[urlParts.indexOf("fid") + 1]
 
                     try {
-                        const zipDownload = await axiosRequest({url, responseType: "arraybuffer"})
+                        const zipDownload = await axiosRequest({url, responseType: "arraybuffer", timeout: settings.axios.downloadTimeout})
                         logger.debug("AWIN.downloadProducts", `Country ${countryCode}`, `Downloaded: ${url}`)
 
                         // Extract the CSV file from the ZIP.

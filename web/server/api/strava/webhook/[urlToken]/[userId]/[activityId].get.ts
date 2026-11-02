@@ -4,6 +4,7 @@ import {events, strava, users} from "strautomator-core"
 import {defineEventHandler, getQuery, getRequestHeader} from "nuxt/server"
 import {renderError, renderJson, getRequiredParam, validateUrlToken} from "../../../../../utils/web"
 import dayjs from "../../../../../utils/dayjs"
+import logger from "anyhow"
 import setmeup from "setmeup"
 const settings = setmeup.settings
 
@@ -37,9 +38,19 @@ export default defineEventHandler(async (event) => {
                 await strava.activityProcessing.queueActivity(user, activityId)
                 user.dateLastProcessedActivity = now
             } else {
-                const processed = await strava.activityProcessing.processActivity(user, {id: activityId})
-                if (processed && !processed.error) {
-                    user.dateLastProcessedActivity = now
+                try {
+                    const processed = await strava.activityProcessing.processActivityWithTimeout(user, {id: activityId})
+                    if (processed && !processed.error) {
+                        user.dateLastProcessedActivity = now
+                    }
+                } catch (ex) {
+                    // Timed out? Queue the activity so it's retried by the next queue run instead of being dropped.
+                    if (ex.isTimeout) {
+                        logger.warn("Routes.strava", `Activity ${activityId} processing timed out, queueing for retry`)
+                        await strava.activityProcessing.queueActivity(user, activityId, false, ex.message)
+                    } else {
+                        throw ex
+                    }
                 }
             }
             events.emit("Strava.activityCreated", user, activityId)

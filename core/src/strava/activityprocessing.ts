@@ -2,6 +2,7 @@
 
 import {StravaActivity, StravaActivityFilter, StravaProcessedActivity, StravaRideType, StravaRunType} from "./types"
 import {isActivityIgnored} from "./utils"
+import {withTimeout} from "../timeout"
 import {updateBatteryTracker} from "../gearwear/battery"
 import {RecipeData} from "../recipes/types"
 import {getActionSummary, getConditionSummary} from "../recipes/utils"
@@ -359,6 +360,19 @@ export class StravaActivityProcessing {
     }
 
     /**
+     * Same as processActivity, but fails with an isTimeout error if processing takes
+     * longer than the configured per-activity timeout. Timed-out activities should be
+     * kept queued (or re-queued) so they are retried on the next run.
+     * @param user The activity's owner (user).
+     * @param pActivity Processed activity metadata.
+     * @param timeoutMs Optional max duration in milliseconds, defaults to the activityTimeout setting.
+     */
+    processActivityWithTimeout = async (user: UserData, pActivity: Partial<StravaProcessedActivity>, timeoutMs?: number): Promise<StravaProcessedActivity> => {
+        const maxMs = timeoutMs || settings.strava.processingQueue.activityTimeout * 1000
+        return withTimeout(this.processActivity(user, pActivity), maxMs, `Timed out processing activity ${pActivity.id} after ${maxMs}ms`)
+    }
+
+    /**
      * Save a processed activity with user and recipe details to the database.
      * @param user The activity's owner.
      * @param activity The Strava activity details.
@@ -513,6 +527,8 @@ export class StravaActivityProcessing {
             if (!activity) activity = {}
             activity.id = activityId
             activity.userId = user.id
+            activity.queued = true
+            activity.processing = false
             activity.dateQueued = activity.dateQueued || new Date()
 
             // Part of a batch processing? Flag it.
@@ -582,12 +598,14 @@ export class StravaActivityProcessing {
 
         try {
             const now = dayjs()
-            const processingCutDate = now.subtract(settings.strava.processingQueue.maxAge / 2, "seconds").toDate()
+            const activityTimeoutMs = settings.strava.processingQueue.activityTimeout * 1000
+            const runDeadline = now.add(settings.strava.processingQueue.maxRunDuration, "seconds")
+            const processingCutDate = now.subtract(settings.strava.processingQueue.processingTimeout, "seconds").toDate()
             const beforeDate = now.subtract(settings.strava.processingQueue.delayedSeconds, "seconds").toDate()
             const queuedActivities = await this.getQueuedActivities(beforeDate, batchSize)
 
-            // Filter activities that are not currently being processed, or that have been queued for at least
-            // half of the maximum allowed queue age regardless of the processing flag.
+            // Filter activities that are not currently being processed, or that have been queued for
+            // longer than the processing timeout (ie. stuck from a crashed run) regardless of the flag.
             const activities = queuedActivities.filter((a) => !a.processing || a.dateQueued < processingCutDate)
             let processedCount = 0
 
@@ -615,8 +633,18 @@ export class StravaActivityProcessing {
                 }
             }
 
-            // Now we process each of the queued activities separately.
-            for (let pActivity of activities) {
+            // Now we process each of the queued activities separately, stopping
+            // once the maximum run duration is reached.
+            let activityIndex = 0
+            for (; activityIndex < activities.length; activityIndex++) {
+                const pActivity = activities[activityIndex]
+
+                // Out of budget? Leftover activities are picked up by the next run.
+                if (dayjs().isAfter(runDeadline)) {
+                    logger.warn("Strava.processQueuedActivities", logBatchSize, `Max run duration exceeded, ${activities.length - activityIndex} activities left for the next run`)
+                    break
+                }
+
                 try {
                     if (!(pActivity.userId in usersCache)) {
                         usersCache[pActivity.userId] = await users.getById(pActivity.userId)
@@ -627,7 +655,7 @@ export class StravaActivityProcessing {
                         continue
                     }
 
-                    const processed = await this.processActivity(usersCache[pActivity.userId], pActivity)
+                    const processed = await this.processActivityWithTimeout(usersCache[pActivity.userId], pActivity, activityTimeoutMs)
 
                     // Queued activity is invalid or had no matching recipes? Delete it.
                     if (!processed) {
@@ -643,6 +671,16 @@ export class StravaActivityProcessing {
                         logger.warn("Strava.processQueuedActivities", `Failed to process queued activity ${pActivity.id} from user ${pActivity.userId}, will retry`)
                         await database.merge("activities", {id: pActivity.id, processing: false, retryCount: pActivity.retryCount + 1})
                     }
+                }
+            }
+
+            // Reset the processing flag on activities that were not attempted in this
+            // run, so they are picked up straight away by the next one.
+            for (let pActivity of activities.slice(activityIndex)) {
+                try {
+                    await database.merge("activities", {id: pActivity.id, processing: false})
+                } catch (innerEx) {
+                    logger.error("Strava.processQueuedActivities", `Failed to reset the processing flag for activity ${pActivity.id} from user ${pActivity.userId}`, innerEx)
                 }
             }
 

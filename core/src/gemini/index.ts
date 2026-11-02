@@ -37,7 +37,7 @@ export class Gemini implements AiProvider {
      */
     init = async (): Promise<void> => {
         try {
-            this.client = new GoogleGenAI({vertexai: true, apiVersion: "v1", project: settings.gcp.projectId, location: settings.gemini.location})
+            this.client = new GoogleGenAI({vertexai: true, apiVersion: "v1", project: settings.gcp.projectId, location: settings.gemini.location, httpOptions: {timeout: settings.ai.timeout}})
 
             // Create the bottleneck rate limiter.
             this.limiter = new Bottleneck({

@@ -4,6 +4,8 @@
 
 {
     "ai": {
+        // Timeout for AI provider calls (OpenRouter, Gemini etc). Value in milliseconds.
+        "timeout": 60000,
         // Cache generated AI content for 1 minute.
         "cacheDuration": 60,
         // List of humours (adjectives) to be used on the AI generated content.
@@ -95,8 +97,12 @@
         "backoffInterval": 500,
         // Retry axios requests after 1.1 seconds. Value set in milliseconds.
         "retryInterval": 1100,
-        // Default timeout of 2.5 minutes for axios requests. Value set in milliseconds.
-        "timeout": 150000
+        // Default timeout of 45 seconds for axios requests, to stay under the
+        // 120 seconds limit of the underlying Cloud Run service. Value in milliseconds.
+        "timeout": 45000,
+        // Timeout of 10 minutes for large file downloads (ie. affiliate product feeds).
+        // Value in milliseconds.
+        "downloadTimeout": 600000
     },
     // AWIN affiliates.
     "awin": {
@@ -134,6 +140,9 @@
         "maxDaysPerBatch": 365,
         // Max number of API requests to be triggered per batch.
         "maxRequestsPerBatch": 600,
+        // How long to wait for an ongoing calendar build before giving up.
+        // Value set in seconds.
+        "buildTimeout": 90,
         // A calendar will be deleted if no client requests it after 4 days.
         "maxCacheDuration": 345600,
         // Maximum number of items allowed per filter in the calendar (sports, club events, etc).
@@ -715,7 +724,16 @@
             // By default 4 days, value set in seconds.
             "maxAge": 345600,
             // Retry processing queued activities up to 5 times.
-            "retry": 5
+            "retry": 5,
+            // Maximum duration allowed to process a single activity, in seconds.
+            // Timed-out activities stay queued and are retried on the next runs.
+            "activityTimeout": 60,
+            // Maximum duration of a single queue processing run, in seconds.
+            // Queued activities that can't start within this budget are left for the next run.
+            "maxRunDuration": 50,
+            // Activities still flagged as processing after this many seconds are
+            // considered stuck (ie. from a crashed run) and picked up again.
+            "processingTimeout": 1800
         },
         "records": {
             // For "average" records, consider only the activities that have at least 20 minutes of moving time.
