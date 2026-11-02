@@ -16,5 +16,5 @@
             "setmeup": ["./node_modules/setmeup/", "../api/node_modules/setmeup/"]
         }
     },
-    "exclude": ["src/**/*.spec.ts"]
+    "exclude": ["lib", "src/**/*.spec.ts"]
 }

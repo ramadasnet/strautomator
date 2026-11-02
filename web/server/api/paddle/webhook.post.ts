@@ -6,15 +6,41 @@ import {renderError, renderJson, readRawBody, toCoreRequest, WebError} from "../
 import logger from "anyhow"
 
 /**
+ * Extract the event identifiers from a raw Paddle webhook payload, for logging purposes.
+ * The full body must never be logged, as it contains personal customer data.
+ * @param body The raw request body.
+ */
+export const paddleEventInfo = (body?: string | Buffer): Record<string, string> => {
+    const info: Record<string, string> = {}
+    try {
+        const parsed = JSON.parse(body?.toString() || "")
+        const eventType = typeof parsed?.event_type == "string" ? parsed.event_type : ""
+        const subscriptionId = eventType.startsWith("subscription.") ? parsed.data?.id : eventType.startsWith("transaction.") ? parsed.data?.subscription_id : null
+        const fields = {eventType: eventType, eventId: parsed?.event_id, subscriptionId: subscriptionId}
+        for (const [key, value] of Object.entries(fields)) {
+            // Restrict to identifier characters, as the body is not signature-verified yet.
+            const cleaned = typeof value == "string" ? value.replace(/[^\w.:-]/g, "").substring(0, 64) : ""
+            if (cleaned) info[key] = cleaned
+        }
+    } catch {
+        // Body is not a valid JSON, nothing to extract.
+    }
+    return info
+}
+
+/**
  * Process Paddle webhooks.
  */
 export default defineEventHandler(async (event) => {
+    // The body is kept out of the event context, so renderError() never logs it.
+    let rawBody: Buffer
     try {
-        const rawBody = await readRawBody(event)
-        event.context.requestBody = rawBody.toString()
+        rawBody = await readRawBody(event)
         await paddle.processWebhook(toCoreRequest(event, rawBody) as any)
     } catch (ex) {
-        logger.error("Routes.paddle", event.req.method, event.url.pathname + event.url.search, ex)
+        const info = paddleEventInfo(rawBody)
+        event.context.requestBody = undefined
+        logger.error("Routes.paddle", event.req.method, event.url.pathname + event.url.search, info, ex)
         if (ex instanceof WebError) return renderError(event, ex)
         return renderError(event, "Failed to process webhook", 500)
     }

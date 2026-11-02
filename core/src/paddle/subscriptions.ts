@@ -227,18 +227,32 @@ export class PaddleSubscriptions {
                     }
                 }
             }
-            if (!user) {
-                throw new Error(`User with Paddle ID ${data.customerId} not found`)
-            }
 
             // Make sure the subscription was previously created.
             let sub = (await subscriptions.getById(data.id)) as PaddleSubscription
+
+            // No user and no matching subscription? The event can't be processed.
+            if (!user && !sub) {
+                throw new Error(`User with Paddle ID ${data.customerId} not found`)
+            }
             if (!sub) {
                 logger.warn("Paddle.onSubscriptionUpdated", logHelper.paddleEvent(entity), "Subscription not found, will create it now")
                 sub = await this.onSubscriptionCreated(entity)
             }
             if (!sub) {
                 throw new Error("Failed to create subscription being updated")
+            }
+            if (!user) {
+                // Without a resolved user, only cancellations are applied (they are final on Paddle,
+                // so a late or out of order delivery can't revert them), and only if the stored
+                // subscription belongs to the same Paddle customer referenced by the event.
+                if (data.status != "canceled") {
+                    throw new Error(`User with Paddle ID ${data.customerId} not found`)
+                }
+                if (!sub.customerId || sub.customerId != data.customerId) {
+                    throw new Error(`Subscription ${sub.id} belongs to a different customer (${sub.customerId} / ${data.customerId})`)
+                }
+                logger.warn("Paddle.onSubscriptionUpdated", logHelper.paddleEvent(entity), `User not found, updating subscription ${sub.id} anyway`)
             }
 
             let hasChanges = false
@@ -256,6 +270,15 @@ export class PaddleSubscriptions {
             }
             if (this.setPaymentDates(updatedSub, data)) {
                 hasChanges = true
+            }
+
+            // Cancelled subscriptions have no future payments.
+            if (data.status == "canceled") {
+                delete updatedSub.dateNextPayment
+                if (sub.dateNextPayment) {
+                    updatedSub.dateNextPayment = FieldValue.delete() as any
+                    hasChanges = true
+                }
             }
 
             _.assign(sub, updatedSub)
