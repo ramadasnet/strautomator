@@ -217,9 +217,7 @@ export class PaddleSubscriptions {
                 }
                 if (user) {
                     logger.info("Paddle.onSubscriptionUpdated", logHelper.paddleEvent(entity), `Found user ${user.id} by previous ID ${userId}, updating Paddle customer`)
-                    await api.client.customers.update(data.customerId, {customData: {userId: user.id}})
                     await subscriptions.update({id: data.id, userId: user.id})
-                    await users.update({id: user.id, displayName: user.displayName, paddleId: data.customerId})
 
                     const previousUser = await users.getById(userId)
                     if (previousUser) {
@@ -227,18 +225,36 @@ export class PaddleSubscriptions {
                     }
                 }
             }
-            if (!user) {
-                throw new Error(`User with Paddle ID ${data.customerId} not found`)
+
+            // User found via custom data but not linked to the Paddle customer yet?
+            // Repair the link so future events (and Paddle retries) resolve the user directly.
+            if (user && user.paddleId != data.customerId) {
+                try {
+                    await users.update({id: user.id, displayName: user.displayName, paddleId: data.customerId})
+                    user.paddleId = data.customerId
+                    await api.client.customers.update(data.customerId, {customData: {userId: user.id}})
+                    logger.info("Paddle.onSubscriptionUpdated", logHelper.paddleEvent(entity), `Linked user ${user.id} to Paddle customer ${data.customerId}`)
+                } catch (ex) {
+                    logger.error("Paddle.onSubscriptionUpdated", logHelper.paddleEvent(entity), `Failed to link user ${user.id} to Paddle customer ${data.customerId}`, ex)
+                }
             }
 
             // Make sure the subscription was previously created.
             let sub = (await subscriptions.getById(data.id)) as PaddleSubscription
+
+            // No user and no matching subscription? The event can't be processed.
+            if (!user && !sub) {
+                throw new Error(`User with Paddle ID ${data.customerId} not found`)
+            }
             if (!sub) {
                 logger.warn("Paddle.onSubscriptionUpdated", logHelper.paddleEvent(entity), "Subscription not found, will create it now")
                 sub = await this.onSubscriptionCreated(entity)
             }
             if (!sub) {
                 throw new Error("Failed to create subscription being updated")
+            }
+            if (!user) {
+                logger.warn("Paddle.onSubscriptionUpdated", logHelper.paddleEvent(entity), `User not found, updating subscription ${sub.id} anyway`)
             }
 
             let hasChanges = false
