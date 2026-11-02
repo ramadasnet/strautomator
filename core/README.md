@@ -105,7 +105,7 @@ Some indexes are needed in Firestore. At the moment there's no automated creatio
 
 Strautomator will store some files on Google Cloud Storage buckets:
 
-- **cache**: generic cache bucket, at the moment used only for affiliate feed caching
+- **cache**: generic cache bucket
 - **calendar**: cached calendar outputs, default name is `bucket-calendar.strautomator.com`
 - **gdpr**: ZIP archives requested by users, default name is `bucket-gdpr.strautomator.com`
 

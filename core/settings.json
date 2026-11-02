@@ -99,23 +99,7 @@
         "retryInterval": 1100,
         // Default timeout of 110 seconds for axios requests, to stay under the
         // 120 seconds limit of the underlying Cloud Run service. Value in milliseconds.
-        "timeout": 110000,
-        // Timeout of 10 minutes for large file downloads (ie. affiliate product feeds).
-        // Value in milliseconds.
-        "downloadTimeout": 600000
-    },
-    // AWIN affiliates.
-    "awin": {
-        "cacheDuration": 300,
-        "api": {
-            "baseUrl": "https://api.awin.com/"
-        },
-        "feeds": {
-            "listUrl": "https://ui.awin.com/productdata-darwin-download/publisher/${publisherId}/${key}/1/feedList",
-            "baseUrl": "https://productdata.awin.com/datafeed/download/apikey/${key}/fid/${feedId}/language/${language}/columns/${columns}/format/csv/delimiter/%7C/compression/zip/adultcontent/1/",
-            "columns": "aw_deep_link,product_name,merchant_image_url,description,merchant_category,merchant_name,category_name,aw_image_url,brand_name,in_stock,product_short_description,product_type,specifications,promotional_text,display_price",
-            "maxAgeDays": 30
-        }
+        "timeout": 110000
     },
     "calendar": {
         // Default activity fields to be added to event details, based on the activity type.
@@ -433,7 +417,14 @@
             // Maximum concurrent requests per instance.
             "maxConcurrent": 4,
             // Maximum requests per minute per instance.
-            "maxPerMinute": 100
+            "maxPerMinute": 100,
+            // Stop sending requests for a while after this many consecutive failures,
+            // so batch processing won't keep hammering a broken endpoint.
+            "failureThreshold": 5,
+            // Initial circuit breaker pause in seconds, doubled after each new outage.
+            "failureCooldown": 60,
+            // Maximum circuit breaker pause in seconds.
+            "failureCooldownMax": 900
         },
         // Models used for each of the AI providers that users can select as their preference.
         // Providers not listed here will use the default model set on the OpenRouter account.

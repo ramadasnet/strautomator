@@ -234,7 +234,7 @@ const tools: ToolDef[] = [
     {
         name: "list_announcements",
         description:
-            "List Strautomator announcements currently targeted at this user, such as new features and service updates. Each announcement has id, title, body, dateStart, dateExpiry and optional href, newFeature and affiliate. The read count is omitted.",
+            "List Strautomator announcements currently targeted at this user, such as new features and service updates. Each announcement has id, title, body, dateStart, dateExpiry and optional href and newFeature. The read count is omitted.",
         inputSchema: {type: "object", properties: {}, additionalProperties: false},
         handler: async (user) => (await announcements.getActive(user)).map(({readCount, ...announcement}) => announcement)
     }
