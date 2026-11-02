@@ -75,7 +75,7 @@ export const rateLimitDelay = async (res: AxiosResponse, urlInfo: URL, rateLimit
 }
 
 /**
- * Make a request using axios. Will retry once if it times out.
+ * Make a request using axios. Will retry once if it fails due to timeout, rate limiting or server errors, as long as the overall timeout allows it.
  * @param options Options to be passed to axios.
  * @param rateLimitExtractor Optional function to extract the rate limit usage (0 to 100%) from the response.
  */
@@ -105,16 +105,18 @@ export const axiosRequest = async (options: AxiosConfig): Promise<AxiosResponse 
         }
     }
 
+    if (!options.method) options.method = "GET"
+    if (!options.timeout) options.timeout = settings.axios.timeout
+    if (!options.headers) options.headers = {}
+
+    // User agent defaults to app title and version.
+    if (!options.headers["User-Agent"]) {
+        options.headers["User-Agent"] = `${settings.app.title} / ${packageVersion}`
+    }
+
+    const startTime = Date.now()
+
     try {
-        if (!options.method) options.method = "GET"
-        if (!options.timeout) options.timeout = settings.axios.timeout
-        if (!options.headers) options.headers = {}
-
-        // User agent defaults to app title and version.
-        if (!options.headers["User-Agent"]) {
-            options.headers["User-Agent"] = `${settings.app.title} / ${packageVersion}`
-        }
-
         // Make request and check for possible rate limits.
         const res: AxiosResponse = await axios(options)
         if (!res) {
@@ -146,33 +148,39 @@ export const axiosRequest = async (options: AxiosConfig): Promise<AxiosResponse 
 
         // Retry the request if it failed due to timeout, rate limiting or server errors.
         if ((isTimeout || isRetryable) && !accessDenied) {
-            try {
-                await jaul.io.sleep(settings.axios.retryInterval)
+            await jaul.io.sleep(settings.axios.retryInterval)
 
-                // On retry processor?
-                if (options.onRetry && options.onRetry(options) === false) {
-                    logger.warn("Axios.axiosRequest", options.method, logUrl, ex, "Failed, and retry condition hasn't passed")
-                    throw ex
-                }
-
-                // Retry the request.
-                const res = await axios(options)
-                if (!res) {
-                    logger.warn("Axios.axiosRequest", options.method, logUrl, ex, "Failed once, then got an empty response")
+            // On retry processor?
+            if (options.onRetry && options.onRetry(options) === false) {
+                logger.warn("Axios.axiosRequest", options.method, logUrl, ex, "Failed, and retry condition hasn't passed")
+            } else {
+                const remaining = options.timeout - (Date.now() - startTime)
+                if (remaining < 1000) {
+                    logger.warn("Axios.axiosRequest", options.method, logUrl, ex, "Failed, no time left to retry")
                 } else {
-                    logger.warn("Axios.axiosRequest", options.method, logUrl, ex, "Failed once, retrying worked")
+                    options.timeout = remaining
+
+                    try {
+                        // Retry the request.
+                        const res = await axios(options)
+                        if (!res) {
+                            logger.warn("Axios.axiosRequest", options.method, logUrl, ex, "Failed once, then got an empty response")
+                        } else {
+                            logger.warn("Axios.axiosRequest", options.method, logUrl, ex, "Failed once, retrying worked")
+                        }
+
+                        // Check limits and return true if a response was a 204 with no body, otherwise return the response body.
+                        await rateLimitDelay(res, urlInfo, options.rateLimitExtractor)
+                        return res.status == 204 && !res.data ? true : options.returnResponse ? res : res.data
+                    } catch (innerEx) {
+                        scrubError(innerEx)
+                        if (!innerEx.url) innerEx.url = options.url.split("?")[0]
+                        if (isTimeout) innerEx.isTimeout = true
+                        logger.warn("Axios.axiosRequest", options.method, logUrl, ex, "Failed twice, will not retry")
+
+                        throw innerEx
+                    }
                 }
-
-                // Check limits and return true if response was a 204 with no body, otherwise return response body.
-                await rateLimitDelay(res, urlInfo, options.rateLimitExtractor)
-                return res.status == 204 && !res.data ? true : options.returnResponse ? res : res.data
-            } catch (innerEx) {
-                scrubError(innerEx)
-                if (!innerEx.url) innerEx.url = options.url.split("?")[0]
-                if (isTimeout) innerEx.isTimeout = true
-                logger.warn("Axios.axiosRequest", options.method, logUrl, ex, "Failed twice, will not retry")
-
-                throw innerEx
             }
         }
 

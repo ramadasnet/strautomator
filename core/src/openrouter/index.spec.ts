@@ -35,6 +35,7 @@ const main = async () => {
     settings.app = settings.app || {}
     settings.app.title = "Strautomator"
     settings.axios = {timeout: 5000, retryInterval: 1, backoffThreshold: 100, backoffInterval: 1}
+    settings.ai = {timeout: 5000}
     settings.openrouter = {
         api: {
             key: "test-key",

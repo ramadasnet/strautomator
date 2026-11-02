@@ -2,6 +2,7 @@
 
 import {StravaActivity, StravaActivityFilter, StravaProcessedActivity, StravaRideType, StravaRunType} from "./types"
 import {isActivityIgnored} from "./utils"
+import {withTimeout} from "../timeout"
 import {updateBatteryTracker} from "../gearwear/battery"
 import {RecipeData} from "../recipes/types"
 import {getActionSummary, getConditionSummary} from "../recipes/utils"
@@ -359,6 +360,19 @@ export class StravaActivityProcessing {
     }
 
     /**
+     * Same as processActivity, but fails with an isTimeout error if processing takes
+     * longer than the configured per-activity timeout. Timed-out activities should be
+     * kept queued (or re-queued) so they are retried on the next run.
+     * @param user The activity's owner (user).
+     * @param pActivity Processed activity metadata.
+     * @param timeoutMs Optional max duration in milliseconds, defaults to the activityTimeout setting.
+     */
+    processActivityWithTimeout = async (user: UserData, pActivity: Partial<StravaProcessedActivity>, timeoutMs?: number): Promise<StravaProcessedActivity> => {
+        const maxMs = timeoutMs || settings.strava.processingQueue.activityTimeout * 1000
+        return withTimeout(this.processActivity(user, pActivity), maxMs, `Timed out processing activity ${pActivity.id} after ${maxMs}ms`)
+    }
+
+    /**
      * Save a processed activity with user and recipe details to the database.
      * @param user The activity's owner.
      * @param activity The Strava activity details.
@@ -496,8 +510,10 @@ export class StravaActivityProcessing {
      * @param activityId The activity's unique ID.
      * @param batch Queued as part of a batch processing for old activities?
      * @param error Queued because of a processing error?
+     * @param processing Flag the activity as processing (lease), so the queue only retries it once the processing timeout expires.
+     * @param webhookAction Pending webhook action (update or delete) to be replayed by the queue instead of a full processing.
      */
-    queueActivity = async (user: UserData, activityId: number, batch?: boolean, error?: any): Promise<void> => {
+    queueActivity = async (user: UserData, activityId: number, batch?: boolean, error?: any, processing?: boolean, webhookAction?: string): Promise<void> => {
         if (user.suspended) {
             logger.warn("Strava.queueActivity", logHelper.user(user), `User suspended, won't process activity ${activityId}`)
             return
@@ -513,6 +529,7 @@ export class StravaActivityProcessing {
             if (!activity) activity = {}
             activity.id = activityId
             activity.userId = user.id
+            activity.queued = true
             activity.dateQueued = activity.dateQueued || new Date()
 
             // Part of a batch processing? Flag it.
@@ -523,6 +540,18 @@ export class StravaActivityProcessing {
             // Previously failed due to an error? Set it.
             if (error) {
                 activity.error = error
+            }
+
+            if (processing) {
+                activity.processing = true
+                activity.dateProcessing = new Date()
+            }
+
+            // Pending webhook action? Set it, or clear any stale one.
+            if (webhookAction) {
+                activity.webhookAction = webhookAction
+            } else {
+                delete activity.webhookAction
             }
 
             await database.set("activities", activity, activityId.toString())
@@ -582,13 +611,15 @@ export class StravaActivityProcessing {
 
         try {
             const now = dayjs()
-            const processingCutDate = now.subtract(settings.strava.processingQueue.maxAge / 2, "seconds").toDate()
+            const activityTimeoutMs = settings.strava.processingQueue.activityTimeout * 1000
+            const runDeadline = now.add(settings.strava.processingQueue.maxRunDuration, "seconds")
+            const processingCutDate = now.subtract(settings.strava.processingQueue.processingTimeout, "seconds").toDate()
             const beforeDate = now.subtract(settings.strava.processingQueue.delayedSeconds, "seconds").toDate()
             const queuedActivities = await this.getQueuedActivities(beforeDate, batchSize)
 
-            // Filter activities that are not currently being processed, or that have been queued for at least
-            // half of the maximum allowed queue age regardless of the processing flag.
-            const activities = queuedActivities.filter((a) => !a.processing || a.dateQueued < processingCutDate)
+            // Filter activities that are not currently being processed, or whose processing lease has
+            // expired (falling back to dateQueued for older entries).
+            const activities = queuedActivities.filter((a) => !a.processing || (a.dateProcessing || a.dateQueued) < processingCutDate)
             let processedCount = 0
 
             // No activities to be processed? Stop here.
@@ -602,21 +633,31 @@ export class StravaActivityProcessing {
             const skipLog = skipped > 0 ? `, skipping ${skipped} already processing` : ""
             logger.info("Strava.processQueuedActivities", logBatchSize, `Will process ${activities.length} activities${skipLog}`)
 
-            // First we set the processing flag on the queued activities to avoid double-processing.
+            // First we set the processing lease on queued activities to avoid double-processing.
             for (let activity of activities) {
                 try {
                     if (_.isNil(activity.retryCount)) {
                         activity.retryCount = 0
                     }
 
-                    await database.merge("activities", {id: activity.id, processing: true})
+                    await database.merge("activities", {id: activity.id, processing: true, dateProcessing: new Date()})
                 } catch (innerEx) {
                     logger.error("Strava.processQueuedActivities", `Failed to set the processing flag for activity ${activity.id} from user ${activity.userId}`, innerEx)
                 }
             }
 
-            // Now we process each of the queued activities separately.
-            for (let pActivity of activities) {
+            // Now we process each of the queued activities separately, stopping
+            // once the maximum run duration is reached.
+            let activityIndex = 0
+            for (; activityIndex < activities.length; activityIndex++) {
+                const pActivity = activities[activityIndex]
+
+                // Out of budget? Leftover activities are picked up by the next run.
+                if (runDeadline.diff(dayjs()) < activityTimeoutMs) {
+                    logger.warn("Strava.processQueuedActivities", logBatchSize, `Max run duration exceeded, ${activities.length - activityIndex} activities left for the next run`)
+                    break
+                }
+
                 try {
                     if (!(pActivity.userId in usersCache)) {
                         usersCache[pActivity.userId] = await users.getById(pActivity.userId)
@@ -627,7 +668,15 @@ export class StravaActivityProcessing {
                         continue
                     }
 
-                    const processed = await this.processActivity(usersCache[pActivity.userId], pActivity)
+                    // Pending webhook action (update / delete)? Replay the matching event
+                    // instead of a full processing, then remove it from the queue.
+                    if (pActivity.webhookAction == "update" || pActivity.webhookAction == "delete") {
+                        eventManager.emit(`Strava.activity${pActivity.webhookAction == "update" ? "Updated" : "Deleted"}`, usersCache[pActivity.userId], pActivity.id)
+                        await this.deleteQueuedActivity(pActivity)
+                        continue
+                    }
+
+                    const processed = await this.processActivityWithTimeout(usersCache[pActivity.userId], pActivity, activityTimeoutMs)
 
                     // Queued activity is invalid or had no matching recipes? Delete it.
                     if (!processed) {
@@ -639,12 +688,27 @@ export class StravaActivityProcessing {
                     if (pActivity.retryCount >= settings.strava.processingQueue.retry) {
                         logger.warn("Strava.processQueuedActivities", `Failed to process queued activity ${pActivity.id} from user ${pActivity.userId} too many times`)
                         await this.deleteQueuedActivity(pActivity)
+                    } else if (activityEx.isTimeout) {
+                        logger.warn("Strava.processQueuedActivities", `Activity ${pActivity.id} from user ${pActivity.userId} timed out, will retry after the processing timeout`)
+                        await database.merge("activities", {id: pActivity.id, processing: true, dateProcessing: new Date(), retryCount: pActivity.retryCount + 1})
                     } else {
                         logger.warn("Strava.processQueuedActivities", `Failed to process queued activity ${pActivity.id} from user ${pActivity.userId}, will retry`)
                         await database.merge("activities", {id: pActivity.id, processing: false, retryCount: pActivity.retryCount + 1})
                     }
                 }
             }
+
+            // Reset the processing flag on activities that were not attempted in this
+            // run, so they are picked up straight away by the next one.
+            await Promise.all(
+                activities.slice(activityIndex).map(async (pActivity) => {
+                    try {
+                        await database.merge("activities", {id: pActivity.id, processing: false})
+                    } catch (innerEx) {
+                        logger.error("Strava.processQueuedActivities", `Failed to reset the processing flag for activity ${pActivity.id} from user ${pActivity.userId}`, innerEx)
+                    }
+                })
+            )
 
             if (processedCount > 0) {
                 logger.info("Strava.processQueuedActivities", logBatchSize, `Processed ${processedCount} out of ${activities.length} queued activities`)

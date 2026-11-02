@@ -13,8 +13,17 @@ export default defineEventHandler(async (event) => {
         const user = await requestValidator(event)
         const activityId = getRequiredParam(event, "activityId")
 
-        const processedActivity = await strava.activityProcessing.processActivity(user, {id: parseInt(activityId as string)})
-        return renderJson(event, processedActivity || {processed: false})
+        try {
+            const processedActivity = await strava.activityProcessing.processActivityWithTimeout(user, {id: parseInt(activityId as string)})
+            return renderJson(event, processedActivity || {processed: false})
+        } catch (ex) {
+            // Timed out? Queue the activity so it's retried by the next queue run instead of being dropped.
+            if (ex.isTimeout) {
+                await strava.activityProcessing.queueActivity(user, parseInt(activityId as string), false, ex.message, true)
+                return renderJson(event, {processed: false, queued: true})
+            }
+            throw ex
+        }
     } catch (ex) {
         const errorMessage = ex.toString()
         return renderError(event, ex, errorMessage.includes("not found") ? 404 : ex.status || ex.statusCode)

@@ -4,6 +4,8 @@
 
 {
     "ai": {
+        // Timeout for AI provider calls (OpenRouter, Gemini etc). Value in milliseconds.
+        "timeout": 60000,
         // Cache generated AI content for 1 minute.
         "cacheDuration": 60,
         // List of humours (adjectives) to be used on the AI generated content.
@@ -95,8 +97,9 @@
         "backoffInterval": 500,
         // Retry axios requests after 1.1 seconds. Value set in milliseconds.
         "retryInterval": 1100,
-        // Default timeout of 2.5 minutes for axios requests. Value set in milliseconds.
-        "timeout": 150000
+        // Default timeout of 110 seconds for axios requests, to stay under the
+        // 120 seconds limit of the underlying Cloud Run service. Value in milliseconds.
+        "timeout": 110000
     },
     "calendar": {
         // Default activity fields to be added to event details, based on the activity type.
@@ -121,6 +124,9 @@
         "maxDaysPerBatch": 365,
         // Max number of API requests to be triggered per batch.
         "maxRequestsPerBatch": 600,
+        // How long to wait for an ongoing calendar build before giving up.
+        // Value set in seconds.
+        "buildTimeout": 90,
         // A calendar will be deleted if no client requests it after 4 days.
         "maxCacheDuration": 345600,
         // Maximum number of items allowed per filter in the calendar (sports, club events, etc).
@@ -710,7 +716,14 @@
             // By default 4 days, value set in seconds.
             "maxAge": 345600,
             // Retry processing queued activities up to 5 times.
-            "retry": 5
+            "retry": 5,
+            // Maximum duration allowed to process a single activity, in seconds.
+            // Timed-out activities stay queued and are retried on the next runs.
+            "activityTimeout": 60,
+            // Maximum duration of a single queue processing run, in seconds. An activity only starts if it can finish (activityTimeout) within this budget, the rest is left for the next run.
+            "maxRunDuration": 90,
+            // Activities flagged as processing for longer than this (since processing started) are considered stuck or timed out and picked up again. Value in seconds.
+            "processingTimeout": 1800
         },
         "records": {
             // For "average" records, consider only the activities that have at least 20 minutes of moving time.

@@ -55,14 +55,23 @@ export default defineEventHandler(async (event) => {
             method: "GET",
             baseURL: settings.api.url || `${settings.app.url}api/`,
             url: `/strava/webhook/${settings.strava.api.urlToken}/${userId}/${objId}?action=${objAspect}&timestamp=${obj.event_time}`,
-            headers: {"User-Agent": `${settings.app.title} / ${packageJson.version}`}
+            headers: {"User-Agent": `${settings.app.title} / ${packageJson.version}`},
+            // Must outlast the per-activity processing timeout, but stay under the Cloud Run request limit.
+            timeout: settings.strava.processingQueue.activityTimeout * 1000 + 15000
         }
 
-        axios(options).catch(() => {
-            logger.warn("Routes.strava", event.req.method, event.url.pathname + event.url.search, "Activity callback endpoint failed, will try again")
-            axios(options).catch((err) => {
-                logger.error("Routes.strava", event.req.method, event.url.pathname + event.url.search, "Activity callback endpoint failed again", err.toString())
-            })
+        // Webhook events are queued before acknowledging, so they are still handled by the queue
+        // if the realtime callback below fails. Creates are processed in full, while updates and
+        // deletes get their webhookAction replayed as the matching activity event.
+        try {
+            const user = await users.getById(userId)
+            if (user) await strava.activityProcessing.queueActivity(user, parseInt(objId), false, undefined, undefined, objAspect == "create" ? undefined : objAspect)
+        } catch (queueEx) {
+            logger.error("Routes.strava", event.req.method, event.url.pathname + event.url.search, `Failed to queue activity ${objId}`, queueEx)
+        }
+
+        axios(options).catch((err) => {
+            logger.warn("Routes.strava", event.req.method, event.url.pathname + event.url.search, `Activity callback endpoint failed, ${objAspect} action stays queued`, err.toString())
         })
         return renderJson(event, {ok: true})
     } catch (ex) {

@@ -4,6 +4,7 @@ import {events, strava, users} from "strautomator-core"
 import {defineEventHandler, getQuery, getRequestHeader} from "nuxt/server"
 import {renderError, renderJson, getRequiredParam, validateUrlToken} from "../../../../../utils/web"
 import dayjs from "../../../../../utils/dayjs"
+import logger from "anyhow"
 import setmeup from "setmeup"
 const settings = setmeup.settings
 
@@ -37,16 +38,37 @@ export default defineEventHandler(async (event) => {
                 await strava.activityProcessing.queueActivity(user, activityId)
                 user.dateLastProcessedActivity = now
             } else {
-                const processed = await strava.activityProcessing.processActivity(user, {id: activityId})
-                if (processed && !processed.error) {
-                    user.dateLastProcessedActivity = now
+                try {
+                    const processed = await strava.activityProcessing.processActivityWithTimeout(user, {id: activityId})
+                    if (processed && !processed.error) {
+                        user.dateLastProcessedActivity = now
+                    } else if (!processed) {
+                        try {
+                            await strava.activityProcessing.deleteQueuedActivity({id: activityId, userId: user.id} as any)
+                        } catch (deleteEx) {
+                            logger.warn("Routes.strava", `Failed to delete queued activity ${activityId} after realtime processing`, deleteEx)
+                        }
+                    }
+                } catch (ex) {
+                    // Timed out? Queue the activity so it's retried by the next queue run instead of being dropped.
+                    if (ex.isTimeout) {
+                        logger.warn("Routes.strava", `Activity ${activityId} processing timed out, queueing for retry`)
+                        await strava.activityProcessing.queueActivity(user, activityId, false, ex.message, true)
+                    } else {
+                        throw ex
+                    }
                 }
             }
             events.emit("Strava.activityCreated", user, activityId)
-        } else if (action == "update") {
-            events.emit("Strava.activityUpdated", user, activityId)
-        } else if (action == "delete") {
-            events.emit("Strava.activityDeleted", user, activityId)
+        } else if (action == "update" || action == "delete") {
+            events.emit(action == "update" ? "Strava.activityUpdated" : "Strava.activityDeleted", user, activityId)
+
+            // Event handled, remove the pre-queued webhook action so the queue does not replay it.
+            try {
+                await strava.activityProcessing.deleteQueuedActivity({id: activityId, userId: user.id} as any)
+            } catch (deleteEx) {
+                logger.warn("Routes.strava", `Failed to delete queued webhook action for activity ${activityId}`, deleteEx)
+            }
         }
 
         user.dateLastActivity = now

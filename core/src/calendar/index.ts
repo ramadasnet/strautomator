@@ -413,7 +413,7 @@ export class Calendar {
             if (buildingTimestamp) {
                 logger.warn("Calendar.generate", logHelper.user(user), optionsLog, `Already building: ${dbCalendar.id}`)
 
-                const maxDate = dayjs(buildingTimestamp).add(settings.axios.timeout / 2, "seconds")
+                const maxDate = dayjs(buildingTimestamp).add(settings.calendar.buildTimeout, "seconds")
                 while (this.building[dbCalendar.id] && maxDate.isAfter(new Date())) {
                     await jaul.io.sleep(settings.axios.backoffInterval)
                 }
