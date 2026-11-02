@@ -243,8 +243,10 @@ export class StravaAPI {
                 })
             } catch (revokeEx) {
                 // Fallback: legacy deauthorize flow, which only needs the access token.
-                this.extractTokenError(revokeEx)
-                logger.debug("Strava.revokeToken", `User ${userId}`, "Revoke endpoint failed, trying deauthorize", revokeEx.friendlyMessage || revokeEx.message)
+                // Error details are logged without extractTokenError, as a failure here is
+                // expected while the endpoints overlap, and shouldn't bump the timeout counters.
+                const details = revokeEx.response?.data?.errors?.map((e: any) => Object.values(e).join(" - ")).join(" | ")
+                logger.debug("Strava.revokeToken", `User ${userId}`, "Revoke endpoint failed, trying deauthorize", details || revokeEx.message)
 
                 await axiosRequest({
                     method: "POST",

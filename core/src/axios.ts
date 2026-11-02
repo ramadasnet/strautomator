@@ -93,6 +93,9 @@ export const axiosRequest = async (options: AxiosConfig): Promise<AxiosResponse 
         if (ex.config?.data) {
             delete ex.config.data
         }
+        if (ex.config?.auth) {
+            delete ex.config.auth
+        }
         delete ex.request
         if (ex.response?.request) {
             ex.response.request = null
