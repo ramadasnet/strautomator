@@ -217,25 +217,14 @@ export class PaddleSubscriptions {
                 }
                 if (user) {
                     logger.info("Paddle.onSubscriptionUpdated", logHelper.paddleEvent(entity), `Found user ${user.id} by previous ID ${userId}, updating Paddle customer`)
+                    await api.client.customers.update(data.customerId, {customData: {userId: user.id}})
                     await subscriptions.update({id: data.id, userId: user.id})
+                    await users.update({id: user.id, displayName: user.displayName, paddleId: data.customerId})
 
                     const previousUser = await users.getById(userId)
                     if (previousUser) {
                         await users.update({id: previousUser.id, displayName: previousUser.displayName, suspended: true, subscriptionId: FieldValue.delete() as any, isPro: FieldValue.delete() as any, paddleId: FieldValue.delete() as any})
                     }
-                }
-            }
-
-            // User found via custom data but not linked to the Paddle customer yet?
-            // Repair the link so future events (and Paddle retries) resolve the user directly.
-            if (user && user.paddleId != data.customerId) {
-                try {
-                    await users.update({id: user.id, displayName: user.displayName, paddleId: data.customerId})
-                    user.paddleId = data.customerId
-                    await api.client.customers.update(data.customerId, {customData: {userId: user.id}})
-                    logger.info("Paddle.onSubscriptionUpdated", logHelper.paddleEvent(entity), `Linked user ${user.id} to Paddle customer ${data.customerId}`)
-                } catch (ex) {
-                    logger.error("Paddle.onSubscriptionUpdated", logHelper.paddleEvent(entity), `Failed to link user ${user.id} to Paddle customer ${data.customerId}`, ex)
                 }
             }
 
@@ -256,7 +245,7 @@ export class PaddleSubscriptions {
             if (!user) {
                 // Without a resolved user, only proceed if the stored subscription
                 // belongs to the same Paddle customer referenced by the event.
-                if (sub.customerId && data.customerId && sub.customerId != data.customerId) {
+                if (!sub.customerId || sub.customerId != data.customerId) {
                     throw new Error(`Subscription ${sub.id} belongs to a different customer (${sub.customerId} / ${data.customerId})`)
                 }
                 logger.warn("Paddle.onSubscriptionUpdated", logHelper.paddleEvent(entity), `User not found, updating subscription ${sub.id} anyway`)
