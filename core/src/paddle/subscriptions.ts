@@ -273,7 +273,7 @@ export class PaddleSubscriptions {
             }
 
             // Cancelled subscriptions have no future payments.
-            if (status == "CANCELLED") {
+            if (data.status == "canceled") {
                 delete updatedSub.dateNextPayment
                 if (sub.dateNextPayment) {
                     updatedSub.dateNextPayment = FieldValue.delete() as any
