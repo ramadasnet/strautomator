@@ -14,9 +14,12 @@ export const paddleEventInfo = (body?: string): Record<string, string> => {
     const info: Record<string, string> = {}
     try {
         const parsed = JSON.parse(body || "")
-        if (parsed?.event_type) info.eventType = parsed.event_type
-        if (parsed?.event_id) info.eventId = parsed.event_id
-        if (parsed?.data?.id) info.subscriptionId = parsed.data.id
+        const fields = {eventType: parsed?.event_type, eventId: parsed?.event_id, subscriptionId: parsed?.data?.id}
+        for (const [key, value] of Object.entries(fields)) {
+            // Restrict to identifier characters, as the body is not signature-verified yet.
+            const cleaned = typeof value == "string" ? value.replace(/[^\w.:-]/g, "").substring(0, 64) : ""
+            if (cleaned) info[key] = cleaned
+        }
     } catch {
         // Body is not a valid JSON, nothing to extract.
     }

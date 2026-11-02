@@ -64,6 +64,12 @@ const run = async () => {
         assert(info.subscriptionId == "sub_01", "event info has the subscription ID")
         assert(!JSON.stringify(info).includes("customer@example.com"), "event info has no customer data")
         assert(Object.keys(paddleEventInfo("not a json")).length == 0, "event info is empty for invalid payloads")
+
+        // The body is not signature-verified when the info is extracted, so fields are sanitized.
+        const hostile = paddleEventInfo(JSON.stringify({event_type: "fake\ninjected", event_id: 42, data: {id: "sub_01 extra text"}}))
+        assert(hostile.eventType == "fakeinjected", "event info strips unsafe characters")
+        assert(hostile.eventId === undefined, "event info ignores non-string fields")
+        assert(hostile.subscriptionId == "sub_01extratext", "event info strips spaces from identifiers")
     }
 
     // Successful processing returns ok.
