@@ -12,7 +12,6 @@ const startupCheck = async (enabledModules) => {
 
 // Settings and individual function modules.
 const settings = require("setmeup").settings
-const affiliates = require("./lib/affiliates")
 const calendar = require("./lib/calendar")
 const garmin = require("./lib/garmin")
 const gearwear = require("./lib/gearwear")
@@ -55,7 +54,7 @@ exports.hourlyTasks = async () => {
 
 // Daily tasks wrapper.
 exports.dailyTasks = async () => {
-    await startupCheck(["affiliates", "calendar", "gearwear", "komoot", "mailer", "notifications", "recipes", "strava", "subscriptions", "users"])
+    await startupCheck(["calendar", "gearwear", "komoot", "mailer", "notifications", "recipes", "strava", "subscriptions", "users"])
 
     try {
         await gearwear.processRecentActivities()
@@ -66,7 +65,6 @@ exports.dailyTasks = async () => {
         await users.resetRecipeCounters()
         await subscriptions.checkExpiring()
         await spotify.checkSpotify()
-        await affiliates.downloadAwinPromotions()
     } catch (ex) {
         logger.warn("Functions.dailyTasks", ex.message || ex.toString())
     }

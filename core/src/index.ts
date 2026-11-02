@@ -109,10 +109,6 @@ import {Notifications} from "./notifications"
 export const notifications: Notifications = Notifications.Instance
 import {Announcements} from "./announcements"
 export const announcements: Announcements = Announcements.Instance
-import {AWIN} from "./awin"
-export const awin: AWIN = AWIN.Instance
-import {Affiliates} from "./affiliates"
-export const affiliates: Affiliates = Affiliates.Instance
 import {Calendar} from "./calendar"
 export const calendar: Calendar = Calendar.Instance
 import {FAQ} from "./faq"
@@ -141,8 +137,6 @@ export * from "./subscriptions/types"
 export * from "./calendar/types"
 export * from "./notifications/types"
 export * from "./announcements/types"
-export * from "./awin/types"
-export * from "./affiliates/types"
 export * from "./github/types"
 export * from "./paypal/types"
 export * from "./paddle/types"
@@ -257,7 +251,7 @@ export const startup = async (quickStart?: boolean) => {
     await Promise.all(coreModules.map(initModule))
     const secondaryModules = [ai, announcements, calendar, faq, gearwear, gdpr, mailer, maps, notifications, openrouter, recipes, weather]
     await Promise.allSettled(secondaryModules.map(initModule))
-    const optionalModules = [affiliates, awin, chatbase, garmin, gemini, komoot, lastfm, music, spotify, wahoo]
+    const optionalModules = [chatbase, garmin, gemini, komoot, lastfm, music, spotify, wahoo]
     await Promise.allSettled(optionalModules.map(initModule))
 
     process.env.SMU_APP_STARTED = "1"
