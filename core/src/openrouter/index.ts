@@ -188,7 +188,10 @@ export class OpenRouter implements AiProvider {
     private registerFailure = (): void => {
         this.failureCount++
         if (this.failureCount >= settings.openrouter.api.failureThreshold) {
-            this.circuitCooldown = this.circuitCooldown ? Math.min(this.circuitCooldown * 2, settings.openrouter.api.failureCooldownMax * 1000) : settings.openrouter.api.failureCooldown * 1000
+            // Escalate the cooldown only once per outage, on the failure that opens the circuit.
+            if (this.circuitUntil <= Date.now()) {
+                this.circuitCooldown = this.circuitCooldown ? Math.min(this.circuitCooldown * 2, settings.openrouter.api.failureCooldownMax * 1000) : settings.openrouter.api.failureCooldown * 1000
+            }
             this.circuitUntil = Date.now() + this.circuitCooldown
             logger.warn("OpenRouter.registerFailure", `${this.failureCount} consecutive failures`, `Requests paused for ${Math.round(this.circuitCooldown / 1000)}s`)
         }

@@ -127,6 +127,10 @@ const main = async () => {
     await openrouter.prompt(user, freeOptions, ["Generate a name"])
     assert((openrouter as any).circuitCooldown == 120000, "cooldown doubles after a new outage")
 
+    // Failures arriving while the circuit is already open do not escalate it again.
+    ;(openrouter as any).registerFailure()
+    assert((openrouter as any).circuitCooldown == 120000, "cooldown escalates only once per outage")
+
     // A successful response resets the circuit breaker.
     ;(openrouter as any).circuitUntil = 0
     apiResponder = () => okResponse("Back online")
