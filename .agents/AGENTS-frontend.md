@@ -8,3 +8,7 @@
 
 - Prefer SCSS, and fallback to CSS only if the current project is using CSS exclusively.
 - Styles must be modular and lean. Reuse existing styles whenever possible.
+
+## Localization
+
+- If the app implements different languages and locales, make sure to update those as well!
