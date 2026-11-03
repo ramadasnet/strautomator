@@ -63,8 +63,10 @@ Made with Cursor
 
 - **Focus on the code, not on the tests!** Reviewing unit tests is fine sometimes, but avoid pointing minor issues or mistakes with tests unless they can cause a P0 / P1 event.
 - **Edge cases with that cause minor events should come last, if at all!** If there's less than 1% chance of a certain codepath being hit, and it does not cause a P0 / P1 event, then it might not be an issue worth addressing if the current review is already too dense.
+- **No nitpicking!** Comments must point to a real problem with a real impact. Code style, formatting, import order, naming preferences, missing comments... none of these are very important.
 
-### Fixing Code Reviews
+### Acting on Code Reviews
 
 - **Challenge the reviewer!** You have more access to the system context than the reviewer. A bug might not be actually a bug if the codepath depends on input that can only originate from a specific dependency.
 - **Unit tests have minor importance.** Only fix unit tests if they have major logic flaws. There's no need to tweak unit tests just so they cover cases that are never happening in the real world.
+- **Resolve the comments.** If you fix something, reply to the relevant review comment with a brief explanation of what was done (or not done), and why.
