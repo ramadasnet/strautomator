@@ -40,7 +40,7 @@ This is a monorepo with 3 modules:
 
 ## Quick start
 
-You'll need **Node.js 20+** (26 recommended), **git**, **make**, a **Google Cloud project** with Firestore, and a **Strava API application**. The [web/SETUP.md](web/SETUP.md) guide explains how to create each of them, step by step.
+You'll need **Node.js 22+** (26 recommended), **git**, **make**, a **Google Cloud project** with Firestore, and a **Strava API application**. The [web/SETUP.md](web/SETUP.md) guide explains how to create each of them, step by step.
 
 **1. Clone and build the core.** The core must be installed first, as the web and functions install a copy of it. Its `npm install` also compiles it to `core/lib`.
 

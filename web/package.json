@@ -1,6 +1,6 @@
 {
     "name": "strautomator-web",
-    "version": "26.451.12243",
+    "version": "26.453.11455",
     "description": "Strautomator.com website.",
     "author": "Igor Ramadas",
     "license": "AGPL-3.0-only",
@@ -11,10 +11,11 @@
     },
     "scripts": {
         "dev": "cross-env STRAUTOMATOR_CRON=true nuxt dev --port 3000",
-        "build": "nuxt build",
+        "build": "nuxt build && node check-bundle.mjs",
         "start": "cross-env NODE_ENV=production node start.mjs",
         "preview": "nuxt preview",
         "typecheck": "nuxt prepare && tsc --noEmit -p .nuxt/tsconfig.server.json",
+        "test": "tsx server/mcp/oauth.spec.ts && tsx server/mcp/utils.spec.ts",
         "postinstall": "nuxt prepare"
     },
     "dependencies": {
@@ -29,7 +30,7 @@
         "dayjs": "^1.11.23",
         "json-editor-vue": "^0.19.2",
         "lodash": "^4.18.1",
-        "nuxt": "npm:nuxt-nightly@5.0.0-2610061304-449e9ce",
+        "nuxt": "npm:nuxt-nightly@5.0.0-2611041151-9fcdd04",
         "pinia": "^4.1.0",
         "setmeup": "^2.0.0",
         "strautomator-core": "file:../core",
@@ -37,7 +38,7 @@
         "vue": "^3.5.44",
         "vue-draggable-plus": "^0.6.1",
         "vue-router": "^5.4.0",
-        "vuetify": "^4.3.1",
+        "vuetify": "^4.3.2",
         "vuetify-nuxt-module": "^1.0.0-rc.6"
     },
     "devDependencies": {
@@ -48,8 +49,14 @@
         "typescript": "^7.0.2"
     },
     "peerDependencies": {
-        "anyhow": "^3.1.2",
+        "anyhow": "^4.0.0",
         "setmeup": "^2.0.0"
+    },
+    "overrides": {
+        "@googlemaps/google-maps-services-js": {
+            "query-string": "10.0.0"
+        },
+        "rimraf": "6.1.4"
     },
     "prettier": {
         "trailingComma": "none",
