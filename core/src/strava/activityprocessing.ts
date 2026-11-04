@@ -347,13 +347,14 @@ export class StravaActivityProcessing {
                     }
                 }
 
-                // Save processed activity to the database and update count on user data.
+                // Save the processed activity first, then update the count on user data. The count is not
+                // touched on deadline retries, as the processed record replaces the queued one.
                 try {
                     signal?.throwIfAborted()
+                    const saved = await this.saveProcessedActivity(user, activity, recipeIds, saveError)
                     await users.setActivityCount(user)
-                    signal?.throwIfAborted()
                     user.activityCount++
-                    return await this.saveProcessedActivity(user, activity, recipeIds, saveError)
+                    return saved
                 } catch (ex) {
                     signal?.throwIfAborted()
                     logger.error("Strava.processActivity", logHelper.user(user), `Activity ${activityId}`, "Not saved to database", ex)
@@ -466,8 +467,8 @@ export class StravaActivityProcessing {
             }
 
             // Save and return result. Empty processed values are removed before saving.
+            // No abort check after this point, so the saved record always gets its event dispatched.
             await database.set("activities", _.omitBy(data, _.isNil), activity.id.toString())
-            signal?.throwIfAborted()
             logger.debug("Strava.saveProcessedActivity", data)
 
             // Dispatch processed event and return saved data.

@@ -9,6 +9,9 @@
         "url": "https://github.com/ramadasnet/strautomator.git",
         "directory": "web"
     },
+    "engines": {
+        "node": "^22.22.0 || ^24.11.0 || >=26.0.0"
+    },
     "scripts": {
         "dev": "cross-env STRAUTOMATOR_CRON=true nuxt dev --port 3000",
         "build": "nuxt build && node check-bundle.mjs",

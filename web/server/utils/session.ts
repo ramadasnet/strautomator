@@ -213,7 +213,7 @@ export const commitSession = (event: RequestEvent): void => {
     setCookie(event, settings.cookie.sessionName, value, {
         httpOnly: true,
         sameSite: "lax",
-        secure: process.env.NODE_ENV == "production" || settings.app.url.startsWith("https://"),
+        secure: settings.app.url.startsWith("https://"),
         path: "/",
         expires: new Date(session.createdAt + session.duration + 1000)
     })

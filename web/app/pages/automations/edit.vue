@@ -324,7 +324,18 @@
 <script setup lang="ts">
 import _ from "lodash"
 
-const JsonEditorVue = defineAsyncComponent(() => import("json-editor-vue"))
+const JsonEditorLoadError = defineComponent({
+    render: () =>
+        h("div", {class: "text-error pa-4"}, [
+            "The JSON editor could not be loaded. ",
+            h("a", {href: "#", class: "text-error", onClick: (e: Event) => (e.preventDefault(), location.reload())}, "Reload the page")
+        ])
+})
+const JsonEditorVue = defineAsyncComponent({
+    loader: () => import("json-editor-vue"),
+    errorComponent: JsonEditorLoadError,
+    onError: (_error, retry, fail, attempts) => (attempts <= 2 ? retry() : fail())
+})
 
 useHead({title: useRoute().query.id ? "Edit automation" : "New automation"})
 
