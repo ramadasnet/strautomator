@@ -4,6 +4,8 @@ import {StravaCachedResponse, StravaTokens} from "./types"
 import {AxiosConfig, AxiosErrorCounter, axiosRequest} from "../axios"
 import {AxiosResponse} from "axios"
 import {URLSearchParams} from "url"
+import {AsyncResource} from "node:async_hooks"
+import {getTimeoutSignal} from "../timeout"
 import database from "../database"
 import eventManager from "../eventmanager"
 import Bottleneck from "bottleneck"
@@ -368,13 +370,14 @@ export class StravaAPI {
             }
 
             // Send request to Strava.
-            const res: AxiosResponse = await this.limiter.schedule(() => axiosRequest(options))
+            const res: AxiosResponse = await this.limiter.schedule(AsyncResource.bind(() => axiosRequest(options)))
             if (!res) {
                 throw new Error("Invalid or empty response")
             }
 
             return res
         } catch (ex) {
+            getTimeoutSignal()?.throwIfAborted()
             const status = ex.response?.status || 500
             const accessDenied = token && (status == 401 || status == 403)
 

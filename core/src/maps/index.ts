@@ -5,6 +5,8 @@ import {emojiFlag, iso1A2Code} from "@rapideditor/country-coder"
 import {Polyline} from "./polyline"
 import {MapAddress, MapCoordinates} from "./types"
 import {axiosRequest} from "../axios"
+import {getTimeoutSignal} from "../timeout"
+import {AsyncResource} from "node:async_hooks"
 import Bottleneck from "bottleneck"
 import database from "../database"
 import cache from "bitecache"
@@ -162,6 +164,7 @@ export class Maps {
     private getGeocode_Google = async (address: string, region?: string): Promise<MapCoordinates[]> => {
         try {
             const geoRequest: GeocodeRequest = {
+                signal: getTimeoutSignal(),
                 params: {
                     address: address,
                     key: settings.maps.api.key
@@ -175,7 +178,9 @@ export class Maps {
             }
 
             // Get geocode from Google Maps.
+            getTimeoutSignal()?.throwIfAborted()
             const res = await this.googleClient.geocode(geoRequest)
+            getTimeoutSignal()?.throwIfAborted()
             if (res?.data?.results?.length > 0) {
                 return res.data.results.map((r) => {
                     return {
@@ -220,7 +225,7 @@ export class Maps {
             }
 
             // Fetch geocode result from LocationIQ.
-            const res: any = await this.lociqLimiter.schedule(() => axiosRequest(options))
+            const res: any = await this.lociqLimiter.schedule(AsyncResource.bind(() => axiosRequest(options)))
             if (res?.data?.length > 0) {
                 return res.data.map((a) => {
                     return {
@@ -302,6 +307,7 @@ export class Maps {
     private getReverseGeocode_Google = async (coordinates: [number, number]): Promise<MapAddress> => {
         try {
             const geoRequest: ReverseGeocodeRequest = {
+                signal: getTimeoutSignal(),
                 params: {
                     latlng: coordinates,
                     key: settings.maps.api.key
@@ -309,7 +315,9 @@ export class Maps {
             }
 
             // Fetch geocode result from Google.
+            getTimeoutSignal()?.throwIfAborted()
             const res = await this.googleClient.reverseGeocode(geoRequest)
+            getTimeoutSignal()?.throwIfAborted()
             if (res?.data?.results?.length > 0) {
                 let result: GeocodeResult
                 result = res.data.results.find((r) => r?.address_components?.find((c) => c.types.includes(AddressType.locality)))
@@ -366,7 +374,7 @@ export class Maps {
             }
 
             // Fetch geocode result from LocationIQ.
-            const res: any = await this.lociqLimiter.schedule(() => axiosRequest(options))
+            const res: any = await this.lociqLimiter.schedule(AsyncResource.bind(() => axiosRequest(options)))
             if (res?.data?.address) {
                 const addressInfo = res.data.address
                 const address: MapAddress = {}

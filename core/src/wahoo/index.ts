@@ -3,6 +3,7 @@
 import {WahooTokens} from "./types"
 import {UserData} from "../users/types"
 import {HttpRequest} from "../http"
+import {FieldValue} from "@google-cloud/firestore"
 import api from "./api"
 import wahooActivities from "./activities"
 import wahooProfiles from "./profiles"
@@ -90,11 +91,11 @@ export class Wahoo {
     getAuthUrl = async (user: UserData): Promise<string> => {
         const baseUrl = settings.api.url || `${settings.app.url}api/`
         const redirectUrl = `${baseUrl}wahoo/auth/callback`
-        const authState = crypto.randomBytes(8).toString("hex")
+        const authState = crypto.randomBytes(18).toString("hex")
         const state = `${user.id}-${authState}`
 
         await users.update({id: user.id, displayName: user.displayName, wahooAuthState: authState})
-        logger.info("Spotify.generateAuthUrl", logHelper.user(user), `State: ${authState}`)
+        logger.info("Wahoo.getAuthUrl", logHelper.user(user), "Generated authorization URL")
 
         return `${settings.wahoo.api.baseUrl}oauth/authorize?client_id=${settings.wahoo.api.clientId}&redirect_uri=${redirectUrl}&response_type=code&state=${state}&scope=${settings.wahoo.api.scopes}`
     }
@@ -134,28 +135,29 @@ export class Wahoo {
         let user: UserData
 
         try {
-            if (!req.query.code || !req.query.state) {
+            if (!_.isString(req.query.code) || !req.query.code || !_.isString(req.query.state) || !req.query.state) {
                 throw new Error("Missing code or state on query")
             }
 
             // State is prefixed with the user ID.
-            const arrState = req.query.state.toString().split("-")
-            const userId = arrState[0]
-            const authState = arrState.pop()
+            const [userId, authState, ...extra] = req.query.state.split("-")
 
             // Validate referenced user.
-            if (!userId) {
+            if (!userId || !authState || extra.length > 0) {
                 throw new Error("Invalid auth state, can't identify user")
             }
-            const user = await users.getById(userId)
+            user = await users.getById(userId)
             if (!user) {
                 throw new Error("Invalid user")
             }
 
-            // Alert (but proceed) if auth state is wrong.
-            if (user.wahooAuthState != authState) {
-                logger.warn("Wahoo.processAuthCode", logHelper.user(user), `Invalid auth state: ${authState}`)
-            }
+            // Consume the state atomically, before exchanging the code, to reject mismatches and replays.
+            await database.runTransaction(async (transaction) => {
+                const saved: UserData = await transaction.get("users", userId)
+                if (!saved?.wahooAuthState || saved.wahooAuthState != authState) throw new Error("Invalid Wahoo auth state")
+                transaction.merge("users", {id: userId, wahooAuthState: FieldValue.delete()})
+            })
+            delete user.wahooAuthState
 
             const tokens = await this.getToken(user, req.query.code as string)
             const profile = await this.profiles.getProfile(user, tokens)

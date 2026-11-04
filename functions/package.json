@@ -1,6 +1,6 @@
 {
     "name": "strautomator-functions",
-    "version": "26.451.12220",
+    "version": "26.453.11307",
     "description": "Strautomator Cloud functions.",
     "author": "Igor Ramadas",
     "main": "index.js",
@@ -23,8 +23,14 @@
         "typescript": "^7.0.2"
     },
     "peerDependencies": {
-        "anyhow": "^3.1.2",
-        "setmeup": "^1.8.2"
+        "anyhow": "^4.0.0",
+        "setmeup": "^2.0.0"
+    },
+    "overrides": {
+        "@googlemaps/google-maps-services-js": {
+            "query-string": "10.0.0"
+        },
+        "rimraf": "6.1.4"
     },
     "prettier": {
         "trailingComma": "none",

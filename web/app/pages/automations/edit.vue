@@ -16,7 +16,7 @@
                     <v-card-title>Conditions and actions (JSON)</v-card-title>
                     <v-card-text :class="{'compact-editor': smAndDown}">
                         <client-only>
-                            <JsonEditorVue v-model="jsonData" class="jse-theme-dark" :validator="validateJson" :indentation="smAndDown ? 2 : 4" />
+                            <JsonEditorVue v-model="jsonData" class="jse-theme-dark" mode="text" :ask-to-format="false" :main-menu-bar="false" :navigation-bar="false" :status-bar="false" :validator="validateJson" :indentation="smAndDown ? 2 : 4" />
                         </client-only>
                         <v-alert color="error" v-if="jsonErrors.length > 0" class="mt-4">
                             <div class="font-weight-bold">JSON validation errors</div>
@@ -323,7 +323,25 @@
 
 <script setup lang="ts">
 import _ from "lodash"
-import JsonEditorVue from "json-editor-vue"
+
+const reloadPage = (e: Event) => {
+    e.preventDefault()
+    if (!hasChanges.value || confirm("You have unsaved changes, reload anyway?")) {
+        location.reload()
+    }
+}
+const JsonEditorLoadError = defineComponent({
+    render: () =>
+        h("div", {class: "text-error pa-4"}, [
+            "The JSON editor could not be loaded. ",
+            h("a", {href: "#", class: "text-error", onClick: reloadPage}, "Reload the page")
+        ])
+})
+const JsonEditorVue = defineAsyncComponent({
+    loader: () => import("json-editor-vue"),
+    errorComponent: JsonEditorLoadError,
+    onError: (_error, retry, fail, attempts) => (attempts <= 2 ? retry() : fail())
+})
 
 useHead({title: useRoute().query.id ? "Edit automation" : "New automation"})
 

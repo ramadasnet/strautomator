@@ -7,7 +7,7 @@ import store from "./store"
 import {callTool, listTools} from "./tools"
 import type {JsonRpcRequest, JsonRpcResponse} from "./types"
 import {emptyResponse, getMcpConfig, jsonResponse, setCorsHeaders, setWwwAuthenticate, withHeaders} from "./utils"
-import {getBody} from "../utils/web"
+import {getBody, WebError} from "../utils/web"
 import logger from "anyhow"
 import packageJson from "../../package.json"
 
@@ -164,6 +164,7 @@ export const handleMcp = async (event: RequestEvent): Promise<Response> => {
         return jsonResponse(event, batch ? responses : responses[0])
     } catch (ex) {
         logger.error("McpProtocol.handleMcp", user.id, ex)
+        if (ex instanceof WebError) return jsonResponse(event, jsonRpcError(null, ex.status == 413 ? -32600 : -32700, ex.message), ex.status)
         return jsonResponse(event, {jsonrpc: "2.0", id: null, error: {code: -32603, message: "Internal error"}}, 500)
     }
 }

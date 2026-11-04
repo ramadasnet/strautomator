@@ -7,6 +7,7 @@ import * as actions from "./actions"
 import * as conditions from "./conditions"
 import {StravaActivity} from "../strava/types"
 import {UserData} from "../users/types"
+import {getTimeoutSignal} from "../timeout"
 import database from "../database"
 import eventManager from "../eventmanager"
 import recipeStats from "./stats"
@@ -236,6 +237,7 @@ export class Recipes {
      * @param activity Strava activity to be evaluated.
      */
     evaluate = async (user: UserData, id: string, activity: StravaActivity): Promise<boolean> => {
+        getTimeoutSignal()?.throwIfAborted()
         const debugLogger = user.debug ? logger.warn : logger.debug
         const recipe: RecipeData = user.recipes[id]
 
@@ -329,9 +331,11 @@ export class Recipes {
         const sortedActions = _.sortBy(activityActions, ["type"])
 
         // Execute activity actions first.
+        getTimeoutSignal()?.throwIfAborted()
         let success: boolean = true
         for (let action of sortedActions) {
             success = success && (await this.processAction(user, activity, recipe, action))
+            getTimeoutSignal()?.throwIfAborted()
         }
 
         // Then execute GearWear component actions, processing all GearWear at once before updating them in the database.
@@ -351,6 +355,7 @@ export class Recipes {
      * @param condition The recipe condition.
      */
     checkCondition = async (user: UserData, activity: StravaActivity, recipe: RecipeData, condition: RecipeCondition): Promise<boolean> => {
+        getTimeoutSignal()?.throwIfAborted()
         const debugLogger = user.debug ? logger.warn : logger.debug
 
         try {
@@ -475,6 +480,7 @@ export class Recipes {
      * @param action Recipe action to be executed.
      */
     processAction = async (user: UserData, activity: StravaActivity, recipe: RecipeData, action: RecipeAction): Promise<boolean> => {
+        getTimeoutSignal()?.throwIfAborted()
         const debugLogger = user.debug ? logger.warn : logger.debug
         debugLogger("Recipes.processAction", logHelper.user(user), logHelper.activity(activity), `${action.type} ${action.value}`)
 

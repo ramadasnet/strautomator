@@ -122,14 +122,17 @@ export class McpStore {
     }
 
     /**
-     * Remove a pending authorization request after consent or denial.
+     * Consume a pending request once, only for the session that viewed its consent form.
      */
-    deleteAuthRequest = async (id: string): Promise<void> => {
-        try {
-            await database.delete("mcp", docId("request", id))
-        } catch (ex) {
-            logger.warn("MCP.deleteAuthRequest", id, ex)
-        }
+    consumeAuthRequest = async (id: string, userId: string, sessionHash: string, consentToken: string): Promise<McpAuthRequest> => {
+        return database.runTransaction(async (transaction) => {
+            const request: McpAuthRequest = fromDoc("request", await transaction.get("mcp", docId("request", id)))
+            if (!request || isExpired(request) || request.consentUserId != userId || request.consentSessionHash != sessionHash || !request.consentToken || hashToken(request.consentToken) != hashToken(consentToken)) {
+                return null
+            }
+            transaction.delete("mcp", docId("request", id))
+            return request
+        })
     }
 
     // AUTH CODES

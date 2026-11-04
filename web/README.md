@@ -46,6 +46,8 @@ The web app also hosts a remote MCP server at `/mcp` for PRO members. MCP client
 
 Users stay on Strava for identity. The MCP authorization server issues its own tokens (audience-bound to `/mcp`) and never accepts or forwards Strava access tokens. Connect from an MCP client using the server URL `https://strautomator.com/mcp`.
 
+JSON and URL-encoded request bodies are limited to 100 KiB, including chunked requests. Signed webhooks use the same byte limit without changing their raw bytes; FIT uploads retain their separate streaming limits.
+
 The frontend resolves the API URL at runtime from the `app.url` setting (or the `$SMU_app_url` environment variable, which sets the same thing), so there's no need to bake it into the Nuxt build.
 
 ### Cloudflare Tunnel

@@ -1,7 +1,8 @@
 // Strautomator Core: Axios
 
 import type {AxiosRequestConfig, AxiosResponse} from "axios"
-import jaul from "jaul"
+import {setTimeout as sleep} from "node:timers/promises"
+import {getTimeoutSignal} from "./timeout"
 import logger from "anyhow"
 import url from "url"
 const axiosModule = require("axios")
@@ -58,19 +59,20 @@ export const rateLimitDelay = async (res: AxiosResponse, urlInfo: URL, rateLimit
             if (usedQuota >= settings.axios.backoffThreshold) {
                 const multiplier = (usedQuota - settings.axios.backoffThreshold) * 1.5
                 const delay = Math.round(settings.axios.backoffInterval * multiplier)
-                await jaul.io.sleep(delay)
+                await sleep(delay, undefined, {signal: getTimeoutSignal()})
 
                 if (modQuota == 1) {
                     logger.warn("Axios.rateLimitDelay", logUrl, `Used ${usedQuota.toFixed(1)}% of API quota`, `Delayed ${delay}ms`)
                 }
             }
         } catch (headerEx) {
+            getTimeoutSignal()?.throwIfAborted()
             logger.warn("Axios.rateLimitDelay", logUrl, "Failed to extract the rate limits", headerEx)
         }
     }
     if (res.status == 429) {
         logger.warn("Axios.rateLimitDelay", logUrl, "Rate limited")
-        await jaul.io.sleep(settings.axios.retryInterval)
+        await sleep(settings.axios.retryInterval, undefined, {signal: getTimeoutSignal()})
     }
 }
 
@@ -80,6 +82,11 @@ export const rateLimitDelay = async (res: AxiosResponse, urlInfo: URL, rateLimit
  * @param rateLimitExtractor Optional function to extract the rate limit usage (0 to 100%) from the response.
  */
 export const axiosRequest = async (options: AxiosConfig): Promise<AxiosResponse | any> => {
+    const signal = getTimeoutSignal()
+    signal?.throwIfAborted()
+    if (signal) {
+        options.signal = options.signal instanceof AbortSignal ? AbortSignal.any([signal, options.signal]) : signal
+    }
     const urlInfo = new url.URL(options.url)
     const logUrl = `${urlInfo.hostname}${urlInfo.pathname}`
 
@@ -119,6 +126,7 @@ export const axiosRequest = async (options: AxiosConfig): Promise<AxiosResponse 
     try {
         // Make request and check for possible rate limits.
         const res: AxiosResponse = await axios(options)
+        signal?.throwIfAborted()
         if (!res) {
             logger.warn("Axios.axiosRequest", options.method, logUrl, "Empty response object")
             return null
@@ -126,9 +134,11 @@ export const axiosRequest = async (options: AxiosConfig): Promise<AxiosResponse 
 
         // Check limits and return true if response was a 204 with no body, otherwise return response body.
         await rateLimitDelay(res, urlInfo, options.rateLimitExtractor)
+        signal?.throwIfAborted()
         return res.status == 204 && !res.data ? true : options.returnResponse ? res : res.data
     } catch (ex) {
         scrubError(ex)
+        signal?.throwIfAborted()
 
         const statusCode = ex.response?.status || 500
         if (!ex.statusCode) {
@@ -148,7 +158,8 @@ export const axiosRequest = async (options: AxiosConfig): Promise<AxiosResponse 
 
         // Retry the request if it failed due to timeout, rate limiting or server errors.
         if ((isTimeout || isRetryable) && !accessDenied) {
-            await jaul.io.sleep(settings.axios.retryInterval)
+            await sleep(settings.axios.retryInterval, undefined, {signal})
+            signal?.throwIfAborted()
 
             // On retry processor?
             if (options.onRetry && options.onRetry(options) === false) {
@@ -163,6 +174,7 @@ export const axiosRequest = async (options: AxiosConfig): Promise<AxiosResponse 
                     try {
                         // Retry the request.
                         const res = await axios(options)
+                        signal?.throwIfAborted()
                         if (!res) {
                             logger.warn("Axios.axiosRequest", options.method, logUrl, ex, "Failed once, then got an empty response")
                         } else {
@@ -171,9 +183,11 @@ export const axiosRequest = async (options: AxiosConfig): Promise<AxiosResponse 
 
                         // Check limits and return true if a response was a 204 with no body, otherwise return the response body.
                         await rateLimitDelay(res, urlInfo, options.rateLimitExtractor)
+                        signal?.throwIfAborted()
                         return res.status == 204 && !res.data ? true : options.returnResponse ? res : res.data
                     } catch (innerEx) {
                         scrubError(innerEx)
+                        signal?.throwIfAborted()
                         if (!innerEx.url) innerEx.url = options.url.split("?")[0]
                         if (isTimeout) innerEx.isTimeout = true
                         logger.warn("Axios.axiosRequest", options.method, logUrl, ex, "Failed twice, will not retry")

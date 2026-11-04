@@ -2,6 +2,8 @@
 
 import {AiGenerateOptions, AiProvider} from "../ai/types"
 import {UserData} from "../users/types"
+import {getTimeoutSignal} from "../timeout"
+import {AsyncResource} from "node:async_hooks"
 import {GoogleGenAI, FinishReason, HarmBlockThreshold, HarmCategory, GenerateContentParameters, ThinkingLevel} from "@google/genai"
 import _ from "lodash"
 import Bottleneck from "bottleneck"
@@ -65,11 +67,14 @@ export class Gemini implements AiProvider {
      * @param messages The messages to be sent.
      */
     prompt = async (user: UserData, options: AiGenerateOptions, messages: string[]): Promise<string> => {
+        const signal = getTimeoutSignal()
+        signal?.throwIfAborted()
         try {
             const reqOptions: GenerateContentParameters = {
                 model: user.isPro && options.useReason ? "gemini-3.8-flash" : "gemini-3.5-flash-lite",
                 contents: [{role: "user", parts: messages.map((p) => ({text: p}))}],
                 config: {
+                    abortSignal: signal,
                     thinkingConfig: {thinkingLevel: user.isPro && options.useReason ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL},
                     systemInstruction: options.instruction,
                     safetySettings: [
@@ -97,7 +102,15 @@ export class Gemini implements AiProvider {
             }
 
             // Here we go!
-            let result = await this.limiter.schedule(() => this.client.models.generateContent(reqOptions))
+            const dispatch = () =>
+                this.limiter.schedule(
+                    AsyncResource.bind(() => {
+                        signal?.throwIfAborted()
+                        return this.client.models.generateContent(reqOptions)
+                    })
+                )
+            let result = await dispatch()
+            signal?.throwIfAborted()
             let text = parseResponse(result)
 
             // If the response was cut due to insufficient tokens and the user is PRO, try again with a higher limit.
@@ -106,7 +119,8 @@ export class Gemini implements AiProvider {
 
                 if (user.isPro) {
                     reqOptions.config.maxOutputTokens = Math.round(options.maxTokens * settings.ai.maxTokens.multiplier)
-                    result = await this.limiter.schedule(() => this.client.models.generateContent(reqOptions))
+                    result = await dispatch()
+                    signal?.throwIfAborted()
                     text = parseResponse(result)
                 }
             }
@@ -120,6 +134,7 @@ export class Gemini implements AiProvider {
             logger.warn("Gemini.prompt", logHelper.user(user), options.subject, "Failed to generate")
             return null
         } catch (ex) {
+            signal?.throwIfAborted()
             logger.error("Gemini.prompt", logHelper.user(user), options.subject, ex)
 
             // Force trigger a rate limit in case we get a "quota exceeded" error.

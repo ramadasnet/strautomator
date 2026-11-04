@@ -17,7 +17,7 @@ The web and functions depend on the core as a local npm package (`file:../core`)
 Some main points to know before you start:
 
 - Code is mostly TypeScript
-- Should run on Node 20+
+- Requires Node 22.12+ (26 recommended)
 - Optimized for GCP (Google Cloud Platform)
 
 ### 3rd party services

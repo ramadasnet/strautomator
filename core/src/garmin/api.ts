@@ -4,6 +4,7 @@ import {GarminTokens, OAuth2Token} from "./types"
 import {UserData} from "../users/types"
 import {AxiosConfig, axiosRequest} from "../axios"
 import {AxiosResponse} from "axios"
+import {AsyncResource} from "node:async_hooks"
 import eventManager from "../eventmanager"
 import users from "../users"
 import Bottleneck from "bottleneck"
@@ -88,7 +89,7 @@ export class GarminAPI {
 
         // Dispatch request.
         try {
-            const res: AxiosResponse = await this.limiter.schedule(() => axiosRequest(options))
+            const res: AxiosResponse = await this.limiter.schedule(AsyncResource.bind(() => axiosRequest(options)))
             return res ? res.data : null
         } catch (ex) {
             logger.error("Garmin.makeRequest", targetUrl, ex)

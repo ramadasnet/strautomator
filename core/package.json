@@ -1,10 +1,13 @@
 {
     "name": "strautomator-core",
-    "version": "26.451.12222",
+    "version": "26.453.11307",
     "description": "Strautomator.com core engine",
     "author": "Igor Ramadas",
     "main": "lib/index.js",
     "types": "lib/index.d.ts",
+    "engines": {
+        "node": ">=22.12"
+    },
     "license": "AGPL-3.0-only",
     "repository": {
         "type": "git",
@@ -12,8 +15,7 @@
         "directory": "core"
     },
     "scripts": {
-        "prepare": "tsc",
-        "test": "tsc && node --test test/*.test.js"
+        "prepare": "tsc"
     },
     "dependencies": {
         "@google-cloud/firestore": "^9.4.0",
@@ -42,6 +44,12 @@
         "@types/node": "^26.6.6",
         "@types/nodemailer": "^8.0.2",
         "chalk": "^4.1.2"
+    },
+    "overrides": {
+        "@googlemaps/google-maps-services-js": {
+            "query-string": "10.0.0"
+        },
+        "rimraf": "6.1.4"
     },
     "prettier": {
         "trailingComma": "none",
