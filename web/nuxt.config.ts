@@ -91,11 +91,11 @@ export default defineNuxtConfig({
     // Nitro server options.
     nitro: {
         preset: "node-server",
-        // The core settings files are loaded relative to the package folder, so it must
+        // The core and Country Linkify settings and assets are loaded relative to their package folders, so they must
         // be fully copied to the output instead of having only the traced files.
         // Firestore and its gRPC stack use CommonJS __dirname to find their proto files, which
         // breaks if bundled into the ES modules output, so they are kept as external packages.
-        traceDeps: ["strautomator-core*", "setmeup", "anyhow", "@google-cloud/firestore*", "google-gax*", "@grpc/grpc-js*", "@grpc/proto-loader*"]
+        traceDeps: ["strautomator-core*", "setmeup", "anyhow", "country-linkify", "@google-cloud/firestore*", "google-gax*", "@grpc/grpc-js*", "@grpc/proto-loader*"]
     },
 
     // The Vite / Vue build options.

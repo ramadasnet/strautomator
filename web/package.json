@@ -29,6 +29,7 @@
         "chart.js": "^4.6.1",
         "chartjs-adapter-dayjs-4": "^1.0.4",
         "chroma-js": "^3.2.0",
+        "country-linkify": "^26.411.11020",
         "cross-env": "^10.1.0",
         "dayjs": "^1.11.23",
         "json-editor-vue": "^0.19.2",
