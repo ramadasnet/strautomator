@@ -1,8 +1,9 @@
 // Strautomator Core: Strava Activity Processing
 
 import {StravaActivity, StravaActivityFilter, StravaProcessedActivity, StravaRideType, StravaRunType} from "./types"
+import {FieldValue} from "@google-cloud/firestore"
 import {isActivityIgnored} from "./utils"
-import {withTimeout} from "../timeout"
+import {getTimeoutSignal, withTimeout} from "../timeout"
 import {updateBatteryTracker} from "../gearwear/battery"
 import {RecipeData} from "../recipes/types"
 import {getActionSummary, getConditionSummary} from "../recipes/utils"
@@ -185,6 +186,8 @@ export class StravaActivityProcessing {
      * @param pActivity Processed activity metadata.
      */
     processActivity = async (user: UserData, pActivity: Partial<StravaProcessedActivity>): Promise<StravaProcessedActivity> => {
+        const signal = getTimeoutSignal()
+        signal?.throwIfAborted()
         const debugLogger = user.debug ? logger.warn : logger.debug
         const activityId = pActivity.id
         let saveError
@@ -211,6 +214,7 @@ export class StravaActivityProcessing {
             try {
                 const countSegments = Object.values(user.recipes || {}).some((r: RecipeData) => !r.disabled && r.counterProp?.startsWith("segments"))
                 activity = await stravaActivities.getActivity(user, activityId, countSegments)
+                signal?.throwIfAborted()
                 if (isActivityIgnored(user, activity, "automation")) {
                     return null
                 }
@@ -219,6 +223,7 @@ export class StravaActivityProcessing {
                     activity.batch = true
                 }
             } catch (ex) {
+                signal?.throwIfAborted()
                 const status = ex.response?.status || ex.status || null
                 const message = ex.message || ex.toString()
 
@@ -241,7 +246,7 @@ export class StravaActivityProcessing {
                 const device = activity.device?.toLowerCase() || ""
                 const isGarminWahoo = (user.garmin?.id || user.wahoo?.id) && (device.includes("garmin") || device.includes("wahoo"))
                 if (user.isPro && isGarminWahoo) {
-                    updateBatteryTracker(user, [activity])
+                    await updateBatteryTracker(user, [activity])
                 }
             } catch (batteryEx) {
                 logger.error("Strava.processActivity", logHelper.user(user), `Activity ${activityId}`, "Failed to update sensor batteries", batteryEx)
@@ -253,14 +258,16 @@ export class StravaActivityProcessing {
                 const powerIncreased = activity.hasPower && activity.wattsWeighted >= user.profile.ftp
                 const isRecent = dayjs().utc().subtract(2, "days").isBefore(activity.dateStart)
                 if (shouldUpdateFtp && powerIncreased && isRecent) {
-                    stravaPerformance.processPerformance(user, [activity], true)
+                    await stravaPerformance.processPerformance(user, [activity], true)
                 }
             } catch (ftpEx) {
                 logger.error("Strava.processActivity", logHelper.user(user), `Activity ${activityId}`, "Failed to auto-update FTP", ftpEx)
             }
 
             // Check for new records.
-            stravaAthletes.checkActivityRecords(user, [activity])
+            signal?.throwIfAborted()
+            await stravaAthletes.checkActivityRecords(user, [activity])
+            signal?.throwIfAborted()
 
             // Check and get recipes, sorted by the user-specified order.
             if (!user.recipes) {
@@ -276,8 +283,11 @@ export class StravaActivityProcessing {
 
             // Evaluate each of user's recipes, and set update to true if something was processed.
             for (recipe of sortedRecipes) {
+                signal?.throwIfAborted()
                 try {
-                    if (await recipes.evaluate(user, recipe.id, activity)) {
+                    const matched = await recipes.evaluate(user, recipe.id, activity)
+                    signal?.throwIfAborted()
+                    if (matched) {
                         recipeIds.push(recipe.id)
 
                         if (recipe.killSwitch) {
@@ -286,6 +296,7 @@ export class StravaActivityProcessing {
                         }
                     }
                 } catch (innerEx) {
+                    signal?.throwIfAborted()
                     logger.error("Strava.processActivity", logHelper.user(user), `Activity ${activityId}`, logHelper.recipe(recipe), innerEx)
                 }
             }
@@ -308,9 +319,12 @@ export class StravaActivityProcessing {
 
                 // Save to Strava!
                 try {
+                    signal?.throwIfAborted()
                     await stravaActivities.setActivity(user, activity)
+                    signal?.throwIfAborted()
                     cache.set("processed-activities", activity.id, activity.dateStart)
                 } catch (ex) {
+                    signal?.throwIfAborted()
                     logger.error("Strava.processActivity", logHelper.user(user), `Activity ${activityId}`, ex)
                     saveError = ex.friendlyMessage || ex.message || ex
 
@@ -335,10 +349,13 @@ export class StravaActivityProcessing {
 
                 // Save processed activity to the database and update count on user data.
                 try {
+                    signal?.throwIfAborted()
                     await users.setActivityCount(user)
+                    signal?.throwIfAborted()
                     user.activityCount++
                     return await this.saveProcessedActivity(user, activity, recipeIds, saveError)
                 } catch (ex) {
+                    signal?.throwIfAborted()
                     logger.error("Strava.processActivity", logHelper.user(user), `Activity ${activityId}`, "Not saved to database", ex)
                     return null
                 }
@@ -360,8 +377,7 @@ export class StravaActivityProcessing {
     }
 
     /**
-     * Same as processActivity, but fails with an isTimeout error if processing takes
-     * longer than the configured per-activity timeout. Timed-out activities should be
+     * Run processing in a cancellable deadline scope. Timed-out activities should be
      * kept queued (or re-queued) so they are retried on the next run.
      * @param user The activity's owner (user).
      * @param pActivity Processed activity metadata.
@@ -369,7 +385,7 @@ export class StravaActivityProcessing {
      */
     processActivityWithTimeout = async (user: UserData, pActivity: Partial<StravaProcessedActivity>, timeoutMs?: number): Promise<StravaProcessedActivity> => {
         const maxMs = timeoutMs || settings.strava.processingQueue.activityTimeout * 1000
-        return withTimeout(this.processActivity(user, pActivity), maxMs, `Timed out processing activity ${pActivity.id} after ${maxMs}ms`)
+        return withTimeout(() => this.processActivity(user, pActivity), maxMs, `Timed out processing activity ${pActivity.id} after ${maxMs}ms`)
     }
 
     /**
@@ -380,6 +396,8 @@ export class StravaActivityProcessing {
      * @param error If errored, this will contain the error details.
      */
     saveProcessedActivity = async (user: UserData, activity: StravaActivity, recipeIds?: string[], error?: string): Promise<StravaProcessedActivity> => {
+        const signal = getTimeoutSignal()
+        signal?.throwIfAborted()
         try {
             const data: StravaProcessedActivity = {
                 id: activity.id,
@@ -427,6 +445,7 @@ export class StravaActivityProcessing {
                     // Weather summaries are not available for batch processed activities.
                     if (!activity.weatherSummary && !activity.batch) {
                         const weatherSummary = await weather.getActivityWeather(user, activity, false)
+                        signal?.throwIfAborted()
                         const anySummary = weatherSummary?.mid || weatherSummary?.start || weatherSummary?.end
                         if (anySummary) {
                             activity.weatherSummary = weatherSummaryString(anySummary)
@@ -448,6 +467,7 @@ export class StravaActivityProcessing {
 
             // Save and return result. Empty processed values are removed before saving.
             await database.set("activities", _.omitBy(data, _.isNil), activity.id.toString())
+            signal?.throwIfAborted()
             logger.debug("Strava.saveProcessedActivity", data)
 
             // Dispatch processed event and return saved data.
@@ -721,20 +741,35 @@ export class StravaActivityProcessing {
     }
 
     /**
-     * Delete the queued or processed activity from the database.
-     * @param activity The activity to be deleted.
+     * Remove queue metadata without deleting processed history, unless Strava deleted the activity.
+     * @param activity The queued activity to be removed.
      */
-    deleteQueuedActivity = async (activity: StravaProcessedActivity): Promise<void> => {
+    deleteQueuedActivity = async (activity: Pick<StravaProcessedActivity, "id" | "userId" | "webhookAction">): Promise<void> => {
+        const activityLog = `Activity ${activity.id}`
         try {
-            const count = await database.delete("activities", activity.id.toString())
+            const result = await database.runTransaction(async (transaction) => {
+                const id = activity.id.toString()
+                const saved: StravaProcessedActivity = await transaction.get("activities", id)
+                if (!saved) return null
+                if (saved.userId != activity.userId) throw new Error("Activity belongs to another user")
 
-            if (count > 0) {
-                logger.info("Strava.deleteQueuedActivity", `User ${activity.userId}`, `${logHelper.activity(activity)} deleted`)
+                if (saved.dateProcessed && activity.webhookAction != "delete") {
+                    const queueFields = ["queued", "batch", "dateQueued", "processing", "dateProcessing", "retryCount", "webhookAction"]
+                    transaction.merge("activities", {id, ...Object.fromEntries(queueFields.map((field) => [field, FieldValue.delete()]))})
+                    return "queue metadata cleared"
+                }
+
+                transaction.delete("activities", id)
+                return "deleted"
+            })
+
+            if (result) {
+                logger.info("Strava.deleteQueuedActivity", `User ${activity.userId}`, `${activityLog} ${result}`)
             } else {
-                logger.warn("Strava.deleteQueuedActivity", `User ${activity.userId}`, `${logHelper.activity(activity)} not previously saved`)
+                logger.warn("Strava.deleteQueuedActivity", `User ${activity.userId}`, `${activityLog} not previously saved`)
             }
         } catch (ex) {
-            logger.error("Strava.deleteQueuedActivity", `User ${activity.userId}`, logHelper.activity(activity), ex)
+            logger.error("Strava.deleteQueuedActivity", `User ${activity.userId}`, activityLog, ex)
             throw ex
         }
     }

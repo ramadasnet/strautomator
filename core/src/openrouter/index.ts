@@ -3,6 +3,8 @@
 import {AiGenerateOptions, AiProvider, AiProviderName} from "../ai/types"
 import {UserData} from "../users/types"
 import {AxiosConfig, axiosRequest} from "../axios"
+import {AsyncResource} from "node:async_hooks"
+import {getTimeoutSignal} from "../timeout"
 import _ from "lodash"
 import Bottleneck from "bottleneck"
 import logger from "anyhow"
@@ -122,7 +124,7 @@ export class OpenRouter implements AiProvider {
             }
 
             // Helper to dispatch the request via the rate limiter.
-            const dispatch = async (): Promise<any> => this.limiter.schedule(() => axiosRequest(reqOptions))
+            const dispatch = async (): Promise<any> => this.limiter.schedule(AsyncResource.bind(() => axiosRequest(reqOptions)))
 
             // Here we go! If the provider rejected the request with a 400 (for instance a model
             // that can't disable reasoning), retry once using the default model.
@@ -154,6 +156,7 @@ export class OpenRouter implements AiProvider {
             logger.warn("OpenRouter.prompt", logHelper.user(user), options.subject, "Failed to generate")
             return null
         } catch (ex) {
+            getTimeoutSignal()?.throwIfAborted()
             this.registerFailure()
             logger.error("OpenRouter.prompt", logHelper.user(user), options.subject, ex)
             return null

@@ -44,7 +44,7 @@ export default defineEventHandler(async (event) => {
                         user.dateLastProcessedActivity = now
                     } else if (!processed) {
                         try {
-                            await strava.activityProcessing.deleteQueuedActivity({id: activityId, userId: user.id} as any)
+                            await strava.activityProcessing.deleteQueuedActivity({id: activityId, userId: user.id})
                         } catch (deleteEx) {
                             logger.warn("Routes.strava", `Failed to delete queued activity ${activityId} after realtime processing`, deleteEx)
                         }
@@ -65,7 +65,7 @@ export default defineEventHandler(async (event) => {
 
             // Event handled, remove the pre-queued webhook action so the queue does not replay it.
             try {
-                await strava.activityProcessing.deleteQueuedActivity({id: activityId, userId: user.id} as any)
+                await strava.activityProcessing.deleteQueuedActivity({id: activityId, userId: user.id, webhookAction: action})
             } catch (deleteEx) {
                 logger.warn("Routes.strava", `Failed to delete queued webhook action for activity ${activityId}`, deleteEx)
             }

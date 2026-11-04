@@ -3,8 +3,9 @@
 import {DocumentReference, FieldValue, Firestore, OrderByDirection, Transaction} from "@google-cloud/firestore"
 import {DatabaseOptions, DatabaseTransaction as DatabaseTransactionApi} from "./types"
 import {cryptoProcess} from "./crypto"
+import {getTimeoutSignal} from "../timeout"
 import _ from "lodash"
-import jaul from "jaul"
+import {setTimeout as sleep} from "node:timers/promises"
 import logger from "anyhow"
 import dayjs from "../dayjs"
 const settings = require("setmeup").settings
@@ -45,6 +46,7 @@ export class DatabaseTransaction implements DatabaseTransactionApi {
      * @param data Fields to merge. Must include the document id.
      */
     merge = (collection: string, data: any): void => {
+        getTimeoutSignal()?.throwIfAborted()
         const encryptedData = _.cloneDeep(data)
         cryptoProcess(encryptedData, true)
         this.txn.set(this.db.doc(collection, data.id), encryptedData, {merge: true})
@@ -54,6 +56,7 @@ export class DatabaseTransaction implements DatabaseTransactionApi {
      * Delete a document inside the transaction.
      */
     delete = (collection: string, id: string): void => {
+        getTimeoutSignal()?.throwIfAborted()
         this.txn.delete(this.db.doc(collection, id))
     }
 }
@@ -144,6 +147,7 @@ export class Database {
      * @param id Unique ID of the document.
      */
     set = async (collection: string, data: any, id: string): Promise<number> => {
+        getTimeoutSignal()?.throwIfAborted()
         if (settings.database.writeDisabled) {
             logger.warn("Database.set", collection, JSON.stringify(data, null, 0), id, "WRITE DISABLED")
             return
@@ -177,6 +181,7 @@ export class Database {
      * @param doc The document reference, optional, if not set will fetch from database based on ID.
      */
     merge = async (collection: string, data: any, doc?: DocumentReference): Promise<number> => {
+        getTimeoutSignal()?.throwIfAborted()
         if (settings.database.writeDisabled) {
             logger.warn("Database.merge", collection, JSON.stringify(data, null, 0), "WRITE DISABLED")
             return
@@ -210,10 +215,12 @@ export class Database {
      * @param id ID of the desired document.
      */
     get = async (collection: string, id: string): Promise<any> => {
+        getTimeoutSignal()?.throwIfAborted()
         let colname = `${collection}${this.collectionSuffix}`
 
         const table = this.firestore.collection(colname)
         const doc = await table.doc(id).get()
+        getTimeoutSignal()?.throwIfAborted()
 
         if (doc.exists) {
             const result: any = doc.data()
@@ -363,6 +370,7 @@ export class Database {
      * @param value Optional increment value, default is 1, can also be negative.
      */
     increment = async (collection: string, id: string, field: string, value?: number): Promise<void> => {
+        getTimeoutSignal()?.throwIfAborted()
         if (settings.database.writeDisabled) {
             logger.warn("Database.increment", collection, id, field, value || 1, "WRITE DISABLED")
             return
@@ -399,6 +407,7 @@ export class Database {
      * @param queryOrId ID or query / queries in the format [property, operator, value].
      */
     delete = async (collection: string, queryOrId: string | any[]): Promise<number> => {
+        getTimeoutSignal()?.throwIfAborted()
         if (settings.database.writeDisabled) {
             logger.warn("Database.delete", collection, JSON.stringify(queryOrId, null, 0), "WRITE DISABLED")
             return
@@ -437,7 +446,9 @@ export class Database {
 
             // Delete page by page, deleted documents won't be returned again on the next query.
             while (true) {
+                getTimeoutSignal()?.throwIfAborted()
                 const snapshot = await pageQuery.get()
+                getTimeoutSignal()?.throwIfAborted()
                 if (snapshot.size == 0) {
                     break
                 }
@@ -494,6 +505,7 @@ export class Database {
          * @param replace Replace full object instead of merging.
          */
         set: async (id: string, data: any, replace?: boolean): Promise<void> => {
+            getTimeoutSignal()?.throwIfAborted()
             if (settings.database.writeDisabled) {
                 logger.warn("Database.appState.set", id, JSON.stringify(data, null, 0), replace || false, "WRITE DISABLED")
                 return
@@ -520,6 +532,7 @@ export class Database {
          * @param value Optional increment value, default is 1, can also be negative.
          */
         increment: async (id: string, field: string, value?: number): Promise<void> => {
+            getTimeoutSignal()?.throwIfAborted()
             if (settings.database.writeDisabled) {
                 logger.warn("Database.appState.increment", id, field, value || 0, "WRITE DISABLED")
                 return
@@ -553,13 +566,17 @@ export class Database {
      * @param handler Callback that performs reads and writes atomically.
      */
     runTransaction = async <T>(handler: (transaction: DatabaseTransaction) => Promise<T>): Promise<T> => {
+        getTimeoutSignal()?.throwIfAborted()
         if (settings.database.writeDisabled) {
             logger.warn("Database.runTransaction", "WRITE DISABLED")
             throw new Error("Database writes are disabled")
         }
 
         return this.firestore.runTransaction(async (txn) => {
-            return handler(new DatabaseTransaction(this, txn))
+            getTimeoutSignal()?.throwIfAborted()
+            const result = await handler(new DatabaseTransaction(this, txn))
+            getTimeoutSignal()?.throwIfAborted()
+            return result
         })
     }
 
@@ -606,13 +623,16 @@ export class Database {
      * @param err Firestore exception.
      */
     isRetryable = async (err: Error): Promise<boolean> => {
+        getTimeoutSignal()?.throwIfAborted()
         try {
             const message = err.toString()
             if (message.includes("DEADLINE_EXCEEDED") || message.includes("RST_STREAM") || message.includes("An internal error occurred")) {
-                await jaul.io.sleep(deadlineTimeout)
+                await sleep(deadlineTimeout, undefined, {signal: getTimeoutSignal()})
+                getTimeoutSignal()?.throwIfAborted()
                 return true
             }
         } catch (ex) {
+            getTimeoutSignal()?.throwIfAborted()
             logger.error("Database.isRetryable", err, ex)
         }
         return false
