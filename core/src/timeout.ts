@@ -8,6 +8,13 @@ const timeoutScope = new AsyncLocalStorage<AbortSignal>()
 export const getTimeoutSignal = (): AbortSignal | undefined => timeoutScope.getStore()
 
 /**
+ * Run an operation outside of any deadline scope, so it can't be aborted midway.
+ * Use for short persistence steps that must complete once an external write has succeeded.
+ * @param operation Factory for the operation.
+ */
+export const withoutTimeout = <T>(operation: () => Promise<T>): Promise<T> => timeoutScope.run(undefined, operation)
+
+/**
  * Apply a deadline. Factories run in a cancellable scope; already-started promises can only be raced.
  * The rejection error has the isTimeout flag, matching axiosRequest timeouts.
  * @param operation Promise or factory to run within the deadline.

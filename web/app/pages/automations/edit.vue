@@ -324,11 +324,17 @@
 <script setup lang="ts">
 import _ from "lodash"
 
+const reloadPage = (e: Event) => {
+    e.preventDefault()
+    if (!hasChanges.value || confirm("You have unsaved changes, reload anyway?")) {
+        location.reload()
+    }
+}
 const JsonEditorLoadError = defineComponent({
     render: () =>
         h("div", {class: "text-error pa-4"}, [
             "The JSON editor could not be loaded. ",
-            h("a", {href: "#", class: "text-error", onClick: (e: Event) => (e.preventDefault(), location.reload())}, "Reload the page")
+            h("a", {href: "#", class: "text-error", onClick: reloadPage}, "Reload the page")
         ])
 })
 const JsonEditorVue = defineAsyncComponent({

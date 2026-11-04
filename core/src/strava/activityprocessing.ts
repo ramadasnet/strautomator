@@ -3,7 +3,7 @@
 import {StravaActivity, StravaActivityFilter, StravaProcessedActivity, StravaRideType, StravaRunType} from "./types"
 import {FieldValue} from "@google-cloud/firestore"
 import {isActivityIgnored} from "./utils"
-import {getTimeoutSignal, withTimeout} from "../timeout"
+import {getTimeoutSignal, withoutTimeout, withTimeout} from "../timeout"
 import {updateBatteryTracker} from "../gearwear/battery"
 import {RecipeData} from "../recipes/types"
 import {getActionSummary, getConditionSummary} from "../recipes/utils"
@@ -317,14 +317,16 @@ export class StravaActivityProcessing {
                     return null
                 }
 
-                // Save to Strava!
+                // Save to Strava! Once written, the remaining persistence below can't be aborted by the deadline,
+                // otherwise the activity would stay queued and the Strava update would be repeated on retry.
+                let stravaWritten = false
                 try {
                     signal?.throwIfAborted()
                     await stravaActivities.setActivity(user, activity)
-                    signal?.throwIfAborted()
+                    stravaWritten = true
                     cache.set("processed-activities", activity.id, activity.dateStart)
                 } catch (ex) {
-                    signal?.throwIfAborted()
+                    if (!stravaWritten) signal?.throwIfAborted()
                     logger.error("Strava.processActivity", logHelper.user(user), `Activity ${activityId}`, ex)
                     saveError = ex.friendlyMessage || ex.message || ex
 
@@ -349,14 +351,18 @@ export class StravaActivityProcessing {
 
                 // Save the processed activity first, then update the count on user data. The count is not
                 // touched on deadline retries, as the processed record replaces the queued one.
-                try {
-                    signal?.throwIfAborted()
+                const persist = async () => {
                     const saved = await this.saveProcessedActivity(user, activity, recipeIds, saveError)
                     await users.setActivityCount(user)
                     user.activityCount++
                     return saved
-                } catch (ex) {
+                }
+                try {
+                    if (stravaWritten) return await withoutTimeout(persist)
                     signal?.throwIfAborted()
+                    return await persist()
+                } catch (ex) {
+                    if (!stravaWritten) signal?.throwIfAborted()
                     logger.error("Strava.processActivity", logHelper.user(user), `Activity ${activityId}`, "Not saved to database", ex)
                     return null
                 }
@@ -754,7 +760,7 @@ export class StravaActivityProcessing {
                 if (!saved) return null
                 if (saved.userId != activity.userId) throw new Error("Activity belongs to another user")
 
-                if (saved.dateProcessed && activity.webhookAction != "delete") {
+                if (saved.dateProcessed && activity.webhookAction != "delete" && saved.webhookAction != "delete") {
                     const queueFields = ["queued", "batch", "dateQueued", "processing", "dateProcessing", "retryCount", "webhookAction"]
                     transaction.merge("activities", {id, ...Object.fromEntries(queueFields.map((field) => [field, FieldValue.delete()]))})
                     return "queue metadata cleared"
