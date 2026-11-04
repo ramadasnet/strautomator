@@ -25,6 +25,8 @@ export interface SessionContent {
     }
     /** Logged user ID. */
     userId?: string
+    /** Random session binding for MCP consent. */
+    consentId?: string
 }
 
 /**
@@ -208,7 +210,13 @@ export const commitSession = (event: RequestEvent): void => {
     }
 
     const value = encodeSession(session.content, session.duration, session.createdAt)
-    setCookie(event, settings.cookie.sessionName, value, {httpOnly: true, path: "/", expires: new Date(session.createdAt + session.duration + 1000)})
+    setCookie(event, settings.cookie.sessionName, value, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV == "production" || settings.app.url.startsWith("https://"),
+        path: "/",
+        expires: new Date(session.createdAt + session.duration + 1000)
+    })
 
     session.json = JSON.stringify(session.content)
     session.dirty = false

@@ -45,6 +45,10 @@ export interface McpAuthRequest {
     scope: string
     /** CSRF token for the consent form. */
     consentToken: string
+    /** User who viewed the consent form. */
+    consentUserId?: string
+    /** SHA-256 of the approving session's consent ID. */
+    consentSessionHash?: string
     /** Date this pending request expires. */
     dateExpiry: Date
 }

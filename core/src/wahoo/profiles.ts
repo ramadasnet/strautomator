@@ -91,6 +91,7 @@ export class WahooProfiles {
             user.wahoo = profile
         } catch (ex) {
             logger.error("Wahoo.saveProfile", logHelper.user(user), `ID ${profile.id}`, ex)
+            throw ex
         }
     }
 

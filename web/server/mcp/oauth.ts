@@ -7,8 +7,8 @@ import {consentPage, errorPage, proRequiredPage} from "./html"
 import store from "./store"
 import type {McpAuthRequest, McpOAuthClient} from "./types"
 import {emptyResponse, firstString, getMcpConfig, hashToken, htmlResponse, isValidRedirectUri, jsonResponse, randomToken, setCorsHeaders, verifyPkce, withHeaders} from "./utils"
-import {getBody, getClientIP} from "../utils/web"
-import {loadSession} from "../utils/session"
+import {getBody, getClientIP, WebError} from "../utils/web"
+import {commitSession, loadSession} from "../utils/session"
 import crypto from "crypto"
 import logger from "anyhow"
 import dayjs from "../utils/dayjs"
@@ -333,6 +333,7 @@ export const registerClient = async (event: RequestEvent): Promise<Response> => 
         return withHeaders(jsonResponse(event, result, 201), rateLimit.headers)
     } catch (ex) {
         logger.error("MCP.registerClient", ex)
+        if (ex instanceof WebError) return withHeaders(oauthErrorJson(event, ex.status, "invalid_request", ex.message), rateLimit.headers)
         return withHeaders(oauthErrorJson(event, 500, "server_error", "Failed to register client"), rateLimit.headers)
     }
 }
@@ -429,14 +430,16 @@ export const authorize = async (event: RequestEvent): Promise<Response | string>
             return htmlResponse(event, proRequiredPage(), 403)
         }
 
+        const session = loadSession(event)
         if (event.req.method == "POST") {
             const consentToken = firstString(body?.consent_token)
             const decision = firstString(body?.decision)
-            if (!consentToken || !request.consentToken || hashToken(consentToken) != hashToken(request.consentToken)) {
+            const consumed = consentToken && session.content.consentId ? await store.consumeAuthRequest(request.id, user.id, hashToken(session.content.consentId), consentToken) : null
+            if (!consumed) {
+                logger.warn("MCP.authorize", `User ${user.id}`, "Consent session or token mismatch")
                 return htmlResponse(event, errorPage("Invalid request", "The consent form could not be validated. Please try again."), 400)
             }
-
-            await store.deleteAuthRequest(request.id)
+            request = consumed
 
             if (decision != "approve") {
                 return oauthRedirect(event, request.redirectUri, {error: "access_denied", error_description: "The user denied the request", state: request.state, iss: config.issuer})
@@ -456,12 +459,23 @@ export const authorize = async (event: RequestEvent): Promise<Response | string>
             return oauthRedirect(event, request.redirectUri, {code, state: request.state, iss: config.issuer})
         }
 
+        session.content.consentId ||= randomToken(18)
+        const sessionHash = hashToken(session.content.consentId)
+        if (request.consentUserId != user.id || request.consentSessionHash != sessionHash) {
+            request.consentUserId = user.id
+            request.consentSessionHash = sessionHash
+            request.consentToken = randomToken(18)
+            await store.saveAuthRequest(request)
+        }
+        commitSession(event)
+
         const client = await store.getClient(request.clientId)
         const redirectUrl = new URL(request.redirectUri)
         const redirectTarget = redirectUrl.host ? `${redirectUrl.protocol}//${redirectUrl.host}` : redirectUrl.protocol
         return htmlResponse(event, consentPage({clientName: client?.clientName || "MCP client", userName: user.displayName || user.id, redirectTarget, requestId: request.id, consentToken: request.consentToken}))
     } catch (ex) {
         logger.error("MCP.authorize", ex)
+        if (ex instanceof WebError) return htmlResponse(event, errorPage("Invalid request", ex.message), ex.status)
         return htmlResponse(event, errorPage("Server error", "Could not complete the authorization request."), 500)
     }
 }
@@ -555,12 +569,13 @@ export const token = async (event: RequestEvent): Promise<Response> => {
         return tokenResponse(event, {error: "unsupported_grant_type", error_description: "Only authorization_code and refresh_token are supported"}, 400)
     } catch (ex) {
         logger.error("MCP.token", ex)
+        if (ex instanceof WebError) return tokenResponse(event, {error: "invalid_request", error_description: ex.message}, ex.status)
         return tokenResponse(event, {error: "server_error", error_description: "Token request failed"}, 500)
     }
 }
 
 /**
- * Token revocation (RFC 7009). Always returns 200 per the spec, even on errors.
+ * Token revocation (RFC 7009). Unknown or already-revoked tokens return 200; request and storage failures do not.
  */
 export const revoke = async (event: RequestEvent): Promise<Response> => {
     try {
@@ -575,6 +590,7 @@ export const revoke = async (event: RequestEvent): Promise<Response> => {
         return emptyResponse(event, 200)
     } catch (ex) {
         logger.error("MCP.revoke", ex)
-        return emptyResponse(event, 200)
+        if (ex instanceof WebError) return oauthErrorJson(event, ex.status, "invalid_request", ex.message)
+        return oauthErrorJson(event, 500, "server_error", "Token revocation failed")
     }
 }

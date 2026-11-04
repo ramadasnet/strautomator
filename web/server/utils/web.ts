@@ -1,6 +1,6 @@
 // Strautomator Web: Request and response helpers
 
-import {getQuery, getRequestHeader, getRequestHeaders, getRequestIP, getRouterParam, getRouterParams, readBody, type RequestEvent} from "nuxt/server"
+import {getQuery, getRequestHeader, getRequestHeaders, getRequestIP, getRouterParam, getRouterParams, type RequestEvent} from "nuxt/server"
 import {Buffer} from "node:buffer"
 import _ from "lodash"
 import logger from "anyhow"
@@ -87,7 +87,7 @@ export const validateUrlToken = (event: RequestEvent, urlToken: string): void =>
 }
 
 /**
- * Read the request body (cached, so it can be read multiple times and logged on errors).
+ * Read JSON or URL-encoded bodies with a 100kb streaming limit (cached for repeated reads).
  * GET and HEAD are skipped unless allowGet is set, because those methods normally have no body.
  * @param event The request event.
  * @param options.allowGet Also read the body of GET and HEAD requests.
@@ -95,7 +95,26 @@ export const validateUrlToken = (event: RequestEvent, urlToken: string): void =>
 export const getBody = async <T = any>(event: RequestEvent, options?: {allowGet?: boolean}): Promise<T> => {
     if (!("requestBody" in event.context)) {
         const skipBody = !options?.allowGet && ["GET", "HEAD"].includes(event.req.method)
-        event.context.requestBody = event.req.body && !skipBody ? await readBody(event) : undefined
+        let body: unknown
+        if (event.req.body && !skipBody) {
+            const text = (await readRawBody(event)).toString("utf8")
+            if (text) {
+                if ((getRequestHeader(event, "content-type") || "").toLowerCase().startsWith("application/x-www-form-urlencoded")) {
+                    const form: Record<string, string | string[]> = Object.create(null)
+                    for (const [key, value] of new URLSearchParams(text)) {
+                        form[key] = key in form ? [...(Array.isArray(form[key]) ? form[key] : [form[key]]), value] : value
+                    }
+                    body = form
+                } else {
+                    try {
+                        body = JSON.parse(text)
+                    } catch (ex) {
+                        throw new WebError("Invalid JSON body", 400)
+                    }
+                }
+            }
+        }
+        event.context.requestBody = body
     }
     return event.context.requestBody as T
 }
