@@ -26,16 +26,16 @@ dry-run:
 	$(TSC)
 	node dry-run.js
 
-# Run basic tests.
+# Run basic tests
 test:
 	$(TSC)
 	@NODE_ENV=test $(MOCHA) --trace-warnings --exit -u tdd -R spec
 
-# Encrypt settings.
+# Encrypt settings
 encrypt:
 	$(SETMEUP) encrypt ./settings.secret.json
 
-# Decrypt settings.
+# Decrypt settings
 decrypt:
 	$(SETMEUP) decrypt ./settings.secret.json
 

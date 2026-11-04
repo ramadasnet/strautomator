@@ -25,3 +25,6 @@ core/lib/
 functions/
 .functions-dist/
 .deploy-*.log
+**/.env
+**/.env.*
+**/gcp-*.json
