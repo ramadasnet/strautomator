@@ -1,0 +1,26 @@
+{
+    "ai": {
+        "disabled": true
+    },
+    "garmin": {
+        "disabled": true
+    },
+    "lastfm": {
+        "disabled": true
+    },
+    "maps": {
+        "disabled": true
+    },
+    "openrouter": {
+        "disabled": true
+    },
+    "paypal": {
+        "disabled": true
+    },
+    "spotify": {
+        "disabled": true
+    },
+    "wahoo": {
+        "disabled": true
+    }
+}

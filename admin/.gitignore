@@ -1,0 +1,15 @@
+.DS_Store
+.output
+.env
+.env.*
+.fleet
+.nitro
+.nuxt
+dist/
+node_modules/
+logs/
+gcp-admin.json
+gcp-strautomator.json
+settings.from-gcp.json
+settings.local.json
+settings.secret.json
