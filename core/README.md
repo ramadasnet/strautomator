@@ -32,7 +32,7 @@ Additional integrations:
 - Chatbase API
 - Garmin Connect API
 - GitHub API
-- Last.fm APi
+- Last.fm API
 - LocationIQ API
 - Paddle API
 - PayPal API
