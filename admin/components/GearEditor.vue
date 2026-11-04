@@ -7,15 +7,26 @@ const saving = ref(false)
 const components = ref<any[]>([])
 const distanceUnit = computed(() => (props.units == "imperial" ? "mi" : "km"))
 
+const toHours = (seconds: number) => Math.round(((seconds || 0) / 3600) * 10) / 10
+
+// Keep the stored seconds when the displayed hours were not edited.
+const toSeconds = (hours: any, original?: number) => {
+    const value = parseFloat(hours || 0)
+    if (original !== undefined && toHours(original) === value) return original
+    return Math.round(value * 3600)
+}
+
 // Editable copy of the components, times are edited in hours.
 const reset = () => {
     components.value = (props.gear?.components || []).map((c: any) => ({
         originalName: c.name,
         name: c.name,
         currentDistance: c.currentDistance || 0,
-        currentHours: Math.round(((c.currentTime || 0) / 3600) * 10) / 10,
+        currentHours: toHours(c.currentTime),
+        originalCurrentTime: c.currentTime || 0,
         alertDistance: c.alertDistance || 0,
-        alertHours: Math.round(((c.alertTime || 0) / 3600) * 10) / 10,
+        alertHours: toHours(c.alertTime),
+        originalAlertTime: c.alertTime || 0,
         preAlertPercent: c.preAlertPercent || 0,
         activityCount: c.activityCount || 0,
         disabled: c.disabled || false,
@@ -37,9 +48,9 @@ const save = async () => {
                 originalName: c.originalName,
                 name: c.name,
                 currentDistance: c.currentDistance,
-                currentTime: Math.round(parseFloat(c.currentHours || 0) * 3600),
+                currentTime: toSeconds(c.currentHours, c.originalCurrentTime),
                 alertDistance: c.alertDistance,
-                alertTime: Math.round(parseFloat(c.alertHours || 0) * 3600),
+                alertTime: toSeconds(c.alertHours, c.originalAlertTime),
                 preAlertPercent: c.preAlertPercent,
                 activityCount: c.activityCount,
                 disabled: c.disabled

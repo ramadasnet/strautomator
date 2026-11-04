@@ -38,6 +38,7 @@ const editorExtensions = [
 ]
 
 const sendEmail = async () => {
+    if (!testRun.value && !confirm(`Send this email to all matching users (${whichUsers.value}, ${whichCountry.value})?`)) return
     try {
         loading.value = true
         sentCount.value = null
@@ -51,15 +52,17 @@ const sendEmail = async () => {
             options.users.ignored = ignoredUsers.value.split(",").map((id) => id.trim())
         }
         options.users[whichUsers.value.toString()] = true
-        const userIds = await $fetch(`/api/mailer/send`, {method: "POST", body: options})
+        const userIds = await api<string[]>(`/api/mailer/send`, {method: "POST", body: options})
 
         sentCount.value = userIds.length
         sentError.value = null
 
-        subject.value = ""
-        body.value = ""
+        if (!testRun.value) {
+            subject.value = ""
+            body.value = ""
+        }
     } catch (ex) {
-        sentError.value = `Failed to send: ${ex.message || ex.toString()}`
+        sentError.value = `Failed to send: ${errorMessage(ex)}`
     } finally {
         loading.value = false
         sentBanner.value = true

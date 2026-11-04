@@ -41,7 +41,7 @@ export default defineEventHandler(async (e) => {
             notification.dateExpiry = dateExpiry
         }
 
-        const result = {sent: [], notFound: []}
+        const result = {sent: [], notFound: [], failed: []}
         await audited(e, "notification.send", userIds.length == 1 ? userIds[0] : `${userIds.length} users`, {userIds: userIds.slice(0, 100), title: notification.title}, async () => {
             for (let chunk of _.chunk(userIds, 20)) {
                 const users: UserData[] = await Promise.all(chunk.map((id) => database.get("users", id)))
@@ -51,8 +51,13 @@ export default defineEventHandler(async (e) => {
                         result.notFound.push(chunk[i])
                         continue
                     }
-                    await notifications.createNotification(user, {...notification, admin: true} as any)
-                    result.sent.push(user.id)
+                    try {
+                        await notifications.createNotification(user, {...notification, admin: true} as any)
+                        result.sent.push(user.id)
+                    } catch (innerEx) {
+                        logger.error("Route.notifications POST", `User ${user.id}`, innerEx)
+                        result.failed.push(user.id)
+                    }
                 }
             }
         })

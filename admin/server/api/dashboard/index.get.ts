@@ -68,7 +68,10 @@ export default defineEventHandler(async () => {
             database.appState.get("strava"),
             database.appState.get("paddle"),
             database.search("announcements", ["dateExpiry", ">", now.toDate()]),
-            database.search(AUDIT_COLLECTION, null, ["dateCreated", "desc"], 15).catch(() => [])
+            database.search(AUDIT_COLLECTION, null, ["dateCreated", "desc"], 15).catch((ex) => {
+                logger.warn("Route.dashboard", "Failed to load the audit entries", ex.message || ex)
+                return []
+            })
         ])
 
         const activeAnnouncements = announcements.filter((a) => !a.dateStart || a.dateStart <= now.toDate())

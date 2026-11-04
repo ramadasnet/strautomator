@@ -15,6 +15,7 @@ const apply = () => {
 }
 
 const applyDebounced = debounce(apply, 600)
+onBeforeUnmount(() => applyDebounced.cancel())
 
 // Clear the field and apply right away.
 const clear = () => {

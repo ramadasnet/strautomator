@@ -31,7 +31,7 @@ const searchSubscriptions = async (search: string): Promise<BaseSubscription[]> 
         ])
         result = _.uniqBy(_.concat(...searches), "id")
     } else if (search.includes(".")) {
-        result = await database.search("subscriptions", ["price", "==", parseFloat(search)])
+        result = await database.search("subscriptions", ["price", "==", parseFloat(search)], undefined, MAX_RESULTS)
     } else {
         result = await database.search("subscriptions", prefixQuery("userId", search), undefined, MAX_RESULTS)
     }

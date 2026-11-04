@@ -1,7 +1,7 @@
 // Strautomator Admin API: grant or revoke PRO for a user
 
 import {BaseSubscription, database, subscriptions, users} from "strautomator-core"
-import {audited, requireUser, parseDate, userView} from "../../../utils/admin"
+import {audited, isRenewingSubscription, requireUser, parseDate, userView} from "../../../utils/admin"
 import dayjs from "dayjs"
 import logger from "anyhow"
 
@@ -20,7 +20,7 @@ export default defineEventHandler(async (e) => {
             if (user.isPro && !user.isTrial) {
                 throw createError({statusCode: 409, message: "User is already PRO"})
             }
-            if (current && ["paddle", "paypal"].includes(current.source) && ["ACTIVE", "TRIAL"].includes(current.status)) {
+            if (isRenewingSubscription(current)) {
                 throw createError({statusCode: 409, message: `User has an ongoing ${current.source} subscription ${current.id}`})
             }
 
@@ -53,7 +53,7 @@ export default defineEventHandler(async (e) => {
             if (!user.isPro) {
                 throw createError({statusCode: 409, message: "User is not PRO"})
             }
-            if (current && ["paddle", "paypal"].includes(current.source) && ["ACTIVE", "TRIAL"].includes(current.status)) {
+            if (isRenewingSubscription(current)) {
                 throw createError({statusCode: 409, message: `Cancel the ${current.source} subscription ${current.id} at the provider first`})
             }
 

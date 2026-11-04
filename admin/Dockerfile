@@ -29,6 +29,7 @@ COPY --from=strautomator-admin-builder /app/admin/node_modules/strautomator-core
 COPY --from=strautomator-admin-builder /app/admin/.output ./.output
 
 EXPOSE 3000
+USER node
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 CMD wget -q --spider http://127.0.0.1:3000/ || exit 1
 
 CMD [ "node", "--env-file-if-exists=.env", ".output/server/index.mjs" ]

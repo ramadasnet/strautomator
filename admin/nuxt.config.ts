@@ -34,6 +34,7 @@ export default defineNuxtConfig({
 
     runtimeConfig: {
         adminAllowedIps: [],
+        adminTrustedProxies: [],
         public: {
             authEmails: ["admin@example.com"],
             googleSignIn: {

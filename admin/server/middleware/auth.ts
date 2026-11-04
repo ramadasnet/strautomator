@@ -1,6 +1,7 @@
 // Strautomator Admin API: server auth middleware (IP allowlist + Google token verification)
 
 import {OAuth2Client} from "google-auth-library"
+import {isIP} from "node:net"
 import cache from "bitecache"
 import logger from "anyhow"
 
@@ -24,11 +25,24 @@ export default defineEventHandler(async (e) => {
     })
 
     // IP allowlist, restricts access to all pages and endpoints. Empty list disables the check.
-    // The client IP is taken from X-Forwarded-For, so the app must sit behind a trusted reverse proxy.
-    const allowedIps = (Array.isArray(config.adminAllowedIps) ? config.adminAllowedIps : String(config.adminAllowedIps).split(",")).map((ip) => ip.trim()).filter(Boolean)
-    const clientIp = (getRequestIP(e, {xForwardedFor: true}) || "").replace("::ffff:", "")
+    // The client IP is the socket peer, X-Forwarded-For is only read when the peer is a trusted proxy.
+    const parseList = (value: any): string[] => (Array.isArray(value) ? value : String(value || "").split(",")).map((ip) => String(ip).trim().replace("::ffff:", "")).filter(Boolean)
+    const allowedIps = parseList(config.adminAllowedIps)
+    const trustedProxies = parseList(config.adminTrustedProxies)
+    const peerIp = (getRequestIP(e) || "").replace("::ffff:", "")
+    const forwardedFor = String(getRequestHeader(e, "x-forwarded-for") || "")
+    let clientIp = peerIp
 
-    if (allowedIps.length > 0 && !allowedIps.includes(clientIp)) {
+    if (trustedProxies.includes(peerIp)) {
+        const forwarded = parseList(forwardedFor)
+        clientIp = [...forwarded].reverse().find((ip) => !trustedProxies.includes(ip)) || peerIp
+    }
+    if (!isIP(clientIp)) clientIp = ""
+
+    // Local requests with no forwarded header (like the container healthcheck) never come from a client.
+    const isLocalCheck = ["127.0.0.1", "::1"].includes(peerIp) && !forwardedFor
+
+    if (allowedIps.length > 0 && !isLocalCheck && !allowedIps.includes(clientIp)) {
         logger.warn("Auth", clientIp || "unknown", "IP not allowed")
 
         // The SPA has no server-rendered error page, so pages get a direct 403 response instead of a thrown error,
@@ -40,7 +54,7 @@ export default defineEventHandler(async (e) => {
         setResponseHeader(e, "content-type", "text/html; charset=utf-8")
         return send(
             e,
-            `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>403 - IP not allowed</title></head><body style="font-family:sans-serif;text-align:center;padding-top:60px"><h1>403 - IP not allowed</h1><p>Your IP ${clientIp || "unknown"} is not allowed to access this application.</p></body></html>`
+            `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>403 - IP not allowed</title></head><body style="font-family:sans-serif;text-align:center;padding-top:60px"><h1>403 - IP not allowed</h1><p>Your IP is not allowed to access this application.</p></body></html>`
         )
     }
 

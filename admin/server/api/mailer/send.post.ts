@@ -91,7 +91,7 @@ export default defineEventHandler(async (e) => {
 
                 userIds.push(user.id)
             } catch (innerEx) {
-                logger.error("Route.mailer POST", JSON.stringify(body, null, 0), `User ${user.id}`, user.email, innerEx)
+                logger.error("Route.mailer POST", body.subject, `User ${user.id}`, innerEx)
             }
         }
 
@@ -113,7 +113,7 @@ export default defineEventHandler(async (e) => {
         logger.info("Route.mailer POST", body.subject, `Sent email to ${userIds.length} users`)
         return userIds
     } catch (ex) {
-        logger.error("Route.mailer POST", JSON.stringify(body, null, 0), ex)
+        logger.error("Route.mailer POST", body?.subject, ex)
         throw ex
     }
 })

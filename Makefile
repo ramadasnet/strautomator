@@ -10,8 +10,8 @@ docker-build:
 	docker buildx build --platform linux/arm64 -f web/Dockerfile -t strautomator/web .
 
 update:
-	$(MAKE) -C admin update
 	$(MAKE) -C core update
+	$(MAKE) -C admin update
 	$(MAKE) -C functions update
 	$(MAKE) -C web update
 

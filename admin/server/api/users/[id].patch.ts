@@ -159,7 +159,8 @@ export default defineEventHandler(async (e) => {
                 await users.update(data)
             }
             if (suspendReason !== null) {
-                await users.suspend(user, suspendReason || "Suspended by the admin")
+                // Reload the user so the suspension email goes to the updated address.
+                await users.suspend((await users.getById(user.id)) || user, suspendReason || "Suspended by the admin")
             }
         })
 

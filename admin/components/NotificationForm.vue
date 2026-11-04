@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import dayjs from "dayjs"
+
 const props = defineProps<{userIds?: string[]}>()
 const emit = defineEmits<{sent: [result: any]}>()
 
@@ -20,10 +22,11 @@ const send = async () => {
     try {
         const result = await api("/api/notifications", {
             method: "POST",
-            body: {userIds: recipientIds.value, title: title.value, body: body.value, href: href.value, dateExpiry: fromDateInput(dateExpiry.value)}
+            body: {userIds: recipientIds.value, title: title.value, body: body.value, href: href.value, dateExpiry: dateExpiry.value ? dayjs(dateExpiry.value).endOf("day").toISOString() : null}
         })
         const notFound = result.notFound.length ? `, not found: ${result.notFound.join(", ")}` : ""
-        notify(`Notification sent to ${result.sent.length} user(s)${notFound}`, result.notFound.length ? "warning" : "success")
+        const failed = result.failed?.length ? `, failed: ${result.failed.join(", ")}` : ""
+        notify(`Notification sent to ${result.sent.length} user(s)${notFound}${failed}`, result.notFound.length || result.failed?.length ? "warning" : "success")
         title.value = ""
         body.value = ""
         href.value = ""

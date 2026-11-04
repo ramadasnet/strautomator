@@ -9,11 +9,12 @@ import _ from "lodash"
  * Parse a non-negative number from the request body.
  * @param value The value.
  * @param field Field name for the error message.
+ * @param max Maximum accepted value.
  */
-const parseNumber = (value: any, field: string): number => {
+const parseNumber = (value: any, field: string, max: number = 1e9): number => {
     if (_.isNil(value) || value === "") return 0
-    const num = parseFloat(value)
-    if (isNaN(num) || num < 0) {
+    const num = typeof value == "number" ? value : Number(value)
+    if (!Number.isFinite(num) || num < 0 || num > max) {
         throw createError({statusCode: 400, message: `Invalid ${field}`})
     }
     return num
@@ -51,7 +52,7 @@ export default defineEventHandler(async (e) => {
                     currentTime: Math.round(parseNumber(c.currentTime, `time of ${name}`)),
                     alertDistance: Math.round(parseNumber(c.alertDistance, `alert distance of ${name}`)),
                     alertTime: Math.round(parseNumber(c.alertTime, `alert time of ${name}`)),
-                    preAlertPercent: Math.round(parseNumber(c.preAlertPercent, `pre-alert of ${name}`)),
+                    preAlertPercent: Math.round(parseNumber(c.preAlertPercent, `pre-alert of ${name}`, 100)),
                     activityCount: Math.round(parseNumber(c.activityCount ?? original?.activityCount, `activity count of ${name}`)),
                     dateLastUpdate: new Date()
                 } as GearWearComponent

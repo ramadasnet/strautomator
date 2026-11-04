@@ -1,7 +1,7 @@
 // Strautomator Admin API: delete user
 
 import {database, users} from "strautomator-core"
-import {audited, requireUser} from "../../utils/admin"
+import {audited, isRenewingSubscription, requireUser} from "../../utils/admin"
 import logger from "anyhow"
 
 export default defineEventHandler(async (e) => {
@@ -16,7 +16,7 @@ export default defineEventHandler(async (e) => {
 
         // Paid subscriptions must be cancelled first, otherwise the user would keep being charged.
         const subscriptions = await database.search("subscriptions", ["userId", "==", user.id])
-        const renewing = subscriptions.find((s) => ["paddle", "paypal"].includes(s.source) && ["ACTIVE", "TRIAL", "APPROVED"].includes(s.status))
+        const renewing = subscriptions.find(isRenewingSubscription)
         if (renewing) {
             throw createError({statusCode: 409, message: `Cancel the ${renewing.source} subscription ${renewing.id} before deleting this user`})
         }

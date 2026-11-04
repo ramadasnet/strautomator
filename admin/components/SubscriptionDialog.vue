@@ -36,9 +36,13 @@ const save = async () => {
             frequency: form.value.frequency || undefined,
             price: form.value.price === "" ? null : form.value.price,
             currency: form.value.currency,
-            dateExpiry: fromDateInput(form.value.dateExpiry),
-            dateNextPayment: fromDateInput(form.value.dateNextPayment),
             syncUser: form.value.syncUser
+        }
+        // Dates are sent only if edited, so unrelated changes do not rewrite them.
+        for (const field of ["dateExpiry", "dateNextPayment"]) {
+            if ((form.value[field] || "") != toDateInput(props.subscription[field])) {
+                body[field] = fromDateInput(form.value[field])
+            }
         }
         if (form.value.userId?.trim()) body.userId = form.value.userId.trim()
 

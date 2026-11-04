@@ -38,6 +38,7 @@ export async function audited<T>(e: H3Event, action: string, target: string, det
         await database.set(AUDIT_COLLECTION, entry, id)
     } catch (ex) {
         logger.error("Admin.audited", action, target, "Failed to write audit entry", ex)
+        throw createError({statusCode: 503, message: "Could not write the audit log, the action was not executed"})
     }
 
     try {
@@ -156,10 +157,10 @@ export const pagedSearch = async (collection: string, where: any[][], orderBy: [
         query = query.where(w[0], w[1], w[2])
     }
 
-    const countQuery = query
     if (orderBy) {
         query = query.orderBy(orderBy[0], orderBy[1])
     }
+    const countQuery = query
 
     const [snapshot, countSnapshot] = await Promise.all([
         query
@@ -225,12 +226,20 @@ export const parseString = (value: any, field: string, maxLength: number, requir
 }
 
 /**
+ * Check if the subscription is a paid one (Paddle or PayPal) that can still charge the user.
+ * @param subscription The subscription.
+ */
+export const isRenewingSubscription = (subscription: any): boolean => {
+    return !!subscription && ["paddle", "paypal"].includes(subscription.source) && ["ACTIVE", "TRIAL", "APPROVED"].includes(subscription.status)
+}
+
+/**
  * Validate a link (href) used on notifications and announcements: internal paths or https URLs.
  * @param value The link.
  */
 export const parseHref = (value: any): string => {
     const href = parseString(value, "link", 500)
-    if (href && !href.startsWith("/") && !/^https:\/\/[^\s]+$/i.test(href)) {
+    if (href && !/^\/(?![\/\\])/.test(href) && !/^https:\/\/[^\s]+$/i.test(href)) {
         throw createError({statusCode: 400, message: "Link must be an internal path (starting with /) or a https:// URL"})
     }
     return href
