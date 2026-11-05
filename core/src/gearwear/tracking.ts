@@ -154,7 +154,7 @@ export const updateTracking = async (user: UserData, config: GearWearConfig, act
                     // Do the same, but for time based (hours) tracking.
                     if (component.alertTime > 0) {
                         const reminderTime = component.alertTime * settings.gearwear.reminderThreshold
-                        const usagePercent = component.currentTime / component.alertTime
+                        const usagePercent = (component.currentTime / component.alertTime) * 100
 
                         if (!component.datePreAlertSent && component.preAlertPercent && usagePercent >= component.preAlertPercent) {
                             await notifyUsage(user, component, activity, "PreAlert")

@@ -15,5 +15,6 @@ export default defineNitroPlugin(async () => {
         }
     } catch (ex) {
         logger.error("Startup", ex)
+        throw ex
     }
 })

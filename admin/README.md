@@ -76,7 +76,7 @@ Variables can also be set in a `.env` file in the `admin` folder (git and Docker
 
 ### IP restriction
 
-Access is restricted by IP on all pages and endpoints, enforced on the server before the Google token check. The allowed IPs are defined in `runtimeConfig.adminAllowedIps`, with no default set (all IPs allowed). The client IP is the socket peer address. `X-Forwarded-For` is only read when the peer is listed in `runtimeConfig.adminTrustedProxies` (empty by default), taking the right-most address that is not a trusted proxy, so clients cannot spoof it. When running behind a reverse proxy, add the proxy IPs to `adminTrustedProxies`, otherwise every request will look like it comes from the proxy. Requests from the loopback address with no `X-Forwarded-For` header (like the Docker healthcheck) skip the allowlist.
+Access is restricted by IP on all pages and endpoints, enforced on the server before the Google token check. The allowed IPs are defined in `runtimeConfig.adminAllowedIps`, with no default set (all IPs allowed). The client IP is the socket peer address. `X-Forwarded-For` is only read when the peer is listed in `runtimeConfig.adminTrustedProxies` (empty by default), taking the right-most address that is not a trusted proxy, so clients cannot spoof it. When running behind a reverse proxy, add the proxy IPs to `adminTrustedProxies`, otherwise every request will look like it comes from the proxy. The `/healthz` route (used by the Docker healthcheck) skips the allowlist when requested from the loopback address with no `X-Forwarded-For` header.
 
 ## Settings
 

@@ -15,13 +15,17 @@ export default defineEventHandler(async (e) => {
         const user = await requireUser(userId)
         const current: BaseSubscription = user.subscriptionId ? await database.get("subscriptions", user.subscriptionId) : null
 
+        // Check all subscriptions of the user, as a paid one might not be linked via user.subscriptionId.
+        const userSubscriptions: BaseSubscription[] = await database.search("subscriptions", ["userId", "==", user.id])
+        const renewing = userSubscriptions.find(isRenewingSubscription)
+
         // Grant PRO via a new "friend" subscription, optionally with an expiry date.
         if (body?.action == "grant") {
             if (user.isPro && !user.isTrial) {
                 throw createError({statusCode: 409, message: "User is already PRO"})
             }
-            if (isRenewingSubscription(current)) {
-                throw createError({statusCode: 409, message: `User has an ongoing ${current.source} subscription ${current.id}`})
+            if (renewing) {
+                throw createError({statusCode: 409, message: `User has an ongoing ${renewing.source} subscription ${renewing.id}`})
             }
 
             const frequency = FREQUENCIES.includes(body.frequency) ? body.frequency : "lifetime"
@@ -53,8 +57,8 @@ export default defineEventHandler(async (e) => {
             if (!user.isPro) {
                 throw createError({statusCode: 409, message: "User is not PRO"})
             }
-            if (isRenewingSubscription(current)) {
-                throw createError({statusCode: 409, message: `Cancel the ${current.source} subscription ${current.id} at the provider first`})
+            if (renewing) {
+                throw createError({statusCode: 409, message: `Cancel the ${renewing.source} subscription ${renewing.id} at the provider first`})
             }
 
             await audited(e, "user.pro.revoke", user.id, {subscriptionId: current?.id || null}, () => users.switchToFree(user, current || undefined))

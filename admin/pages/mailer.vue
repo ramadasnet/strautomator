@@ -52,12 +52,13 @@ const sendEmail = async () => {
             options.users.ignored = ignoredUsers.value.split(",").map((id) => id.trim())
         }
         options.users[whichUsers.value.toString()] = true
-        const userIds = await api<string[]>(`/api/mailer/send`, {method: "POST", body: options})
+        const result = await api<{attempted: number; sent: string[]; failed: string[]}>(`/api/mailer/send`, {method: "POST", body: options})
 
-        sentCount.value = userIds.length
-        sentError.value = null
+        sentCount.value = result.sent.length
+        sentError.value = result.failed.length > 0 ? `Sent to ${result.sent.length} users, but failed for ${result.failed.length}: ${result.failed.slice(0, 10).join(", ")}` : null
 
-        if (!testRun.value) {
+        // Keep the draft if nothing was attempted or some sends failed.
+        if (!testRun.value && result.attempted > 0 && result.failed.length == 0) {
             subject.value = ""
             body.value = ""
         }

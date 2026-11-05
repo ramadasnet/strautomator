@@ -39,8 +39,8 @@ export default defineEventHandler(async (e) => {
     }
     if (!isIP(clientIp)) clientIp = ""
 
-    // Local requests with no forwarded header (like the container healthcheck) never come from a client.
-    const isLocalCheck = ["127.0.0.1", "::1"].includes(peerIp) && !forwardedFor
+    // Only the dedicated healthcheck route is exempt, and only for loopback requests with no forwarded header.
+    const isLocalCheck = e.path == "/healthz" && ["127.0.0.1", "::1"].includes(peerIp) && !forwardedFor
 
     if (allowedIps.length > 0 && !isLocalCheck && !allowedIps.includes(clientIp)) {
         logger.warn("Auth", clientIp || "unknown", "IP not allowed")

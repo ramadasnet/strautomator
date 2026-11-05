@@ -35,7 +35,10 @@ export async function audited<T>(e: H3Event, action: string, target: string, det
     const entry: any = {id: id, actor: e.context.adminEmail || "unknown", action: action, target: target, details: sanitizeDetails(details), status: "pending", dateCreated: new Date()}
 
     try {
-        await database.set(AUDIT_COLLECTION, entry, id)
+        // The database returns nothing when writes are disabled, which means no audit entry was stored.
+        if (!(await database.set(AUDIT_COLLECTION, entry, id))) {
+            throw new Error("Audit entry was not written (database writes disabled?)")
+        }
     } catch (ex) {
         logger.error("Admin.audited", action, target, "Failed to write audit entry", ex)
         throw createError({statusCode: 503, message: "Could not write the audit log, the action was not executed"})

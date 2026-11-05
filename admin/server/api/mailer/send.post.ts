@@ -75,6 +75,7 @@ export default defineEventHandler(async (e) => {
 
         const testRun = body.testRun === true
         const userIds = []
+        const failed = []
         const sendToUser = async (user) => {
             try {
                 const data = {
@@ -91,6 +92,7 @@ export default defineEventHandler(async (e) => {
 
                 userIds.push(user.id)
             } catch (innerEx) {
+                failed.push(user.id)
                 logger.error("Route.mailer POST", body.subject, `User ${user.id}`, innerEx)
             }
         }
@@ -103,6 +105,7 @@ export default defineEventHandler(async (e) => {
             users = users.slice(0, 3)
         }
 
+        const attempted = users.length
         const details = {subject: body.subject, filter: body.users, testRun: testRun, recipients: users.length}
         await audited(e, "mailer.send", testRun ? "test" : "users", details, async () => {
             while (users.length) {
@@ -111,7 +114,7 @@ export default defineEventHandler(async (e) => {
         })
 
         logger.info("Route.mailer POST", body.subject, `Sent email to ${userIds.length} users`)
-        return userIds
+        return {attempted, sent: userIds, failed}
     } catch (ex) {
         logger.error("Route.mailer POST", body?.subject, ex)
         throw ex

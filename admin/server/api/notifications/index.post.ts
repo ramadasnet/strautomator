@@ -44,9 +44,20 @@ export default defineEventHandler(async (e) => {
         const result = {sent: [], notFound: [], failed: []}
         await audited(e, "notification.send", userIds.length == 1 ? userIds[0] : `${userIds.length} users`, {userIds: userIds.slice(0, 100), title: notification.title}, async () => {
             for (let chunk of _.chunk(userIds, 20)) {
-                const users: UserData[] = await Promise.all(chunk.map((id) => database.get("users", id)))
+                const users: UserData[] = await Promise.all(
+                    chunk.map((id) =>
+                        database.get("users", id).catch((lookupEx) => {
+                            logger.error("Route.notifications POST", `User ${id}`, lookupEx)
+                            return null
+                        })
+                    )
+                )
                 for (let i = 0; i < chunk.length; i++) {
                     const user = users[i]
+                    if (user === null) {
+                        result.failed.push(chunk[i])
+                        continue
+                    }
                     if (!user) {
                         result.notFound.push(chunk[i])
                         continue
