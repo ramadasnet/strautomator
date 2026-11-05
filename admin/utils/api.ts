@@ -8,7 +8,7 @@
  */
 export const api = async <T = any>(url: string, options: any = {}): Promise<T> => {
     try {
-        return (await $fetch(url, options)) as T
+        return (await $fetch<T, string>(url, options)) as T
     } catch (ex) {
         if (ex?.status == 401 || ex?.statusCode == 401) {
             useCookie("auth").value = null
