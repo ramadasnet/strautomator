@@ -11,6 +11,7 @@ docker-build:
 
 update:
 	$(MAKE) -C core update
+	$(MAKE) -C admin update
 	$(MAKE) -C functions update
 	$(MAKE) -C web update
 

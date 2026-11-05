@@ -2,3 +2,6 @@
 settings.secret.json
 settings.test.json
 *.log
+.env
+.env.*
+deployment/

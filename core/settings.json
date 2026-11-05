@@ -76,7 +76,7 @@
             "uk": ["gb"]
         },
         "images": {
-            "path": "./static/images/affiliates/"
+            "path": "./public/images/affiliates/"
         },
         "server": {
             "basePath": "/affiliates/",

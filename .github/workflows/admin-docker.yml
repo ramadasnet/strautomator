@@ -1,0 +1,40 @@
+name: Deploy admin Docker image
+on:
+    push:
+        branches:
+            - master
+        paths:
+            - "admin/**"
+    workflow_dispatch:
+concurrency:
+    group: admin-docker
+    cancel-in-progress: true
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            packages: write
+        steps:
+            - uses: actions/checkout@v7
+            - id: image
+              run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/strautomator-admin" >> "$GITHUB_OUTPUT"
+            - uses: docker/setup-qemu-action@v4
+            - uses: docker/setup-buildx-action@v4
+            - uses: docker/login-action@v4
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+            # Built from the repository root, as the admin depends on the local core.
+            - uses: docker/build-push-action@v7
+              with:
+                  context: .
+                  file: admin/Dockerfile
+                  platforms: linux/amd64,linux/arm64
+                  push: true
+                  tags: |
+                      ${{ steps.image.outputs.name }}:${{ github.sha }}
+                      ${{ steps.image.outputs.name }}:latest
+                  cache-from: type=gha,scope=admin
+                  cache-to: type=gha,scope=admin,mode=max

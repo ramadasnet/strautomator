@@ -9,6 +9,7 @@ This is a monorepo with 3 modules:
 | [core](core#readme)           | Business logic, database, storage and 3rd party integrations (TypeScript). | Bundled into the web/functions.  |
 | [web](web#readme)             | Website, API, webhooks and MCP server (Nuxt, Vue 3, Vuetify).              | Google Cloud Run                 |
 | [functions](functions#readme) | Scheduled maintenance tasks (subscriptions, GearWear, cleanup, counters).  | Google Cloud Functions (1st gen) |
+| [admin](admin#readme)         | Internal admin panel (Nuxt SPA, Vuetify) for users, subscriptions, gear.   | Docker image (GHCR)              |
 
 ## Architecture
 
@@ -87,14 +88,6 @@ When you change the core, run `make build` on the `core` folder. The `make run` 
 
 ## Builds and deployments
 
-Everything runs on Google Cloud Build, using the [cloudbuild.yaml](cloudbuild.yaml) on the repository root:
-
-| Event                    | Trigger               | Result                                                                   |
-| ------------------------ | --------------------- | ------------------------------------------------------------------------ |
-| Pull request to `master` | `strautomator-pr`     | Build only (web image + functions), nothing is pushed or deployed.       |
-| Push / merge to `master` | `strautomator-build`  | Build only (web image + functions), nothing is pushed or deployed.       |
-| New `v*` tag             | `strautomator-deploy` | Build, push the web image (`:vX` and `:latest`), deploy web + functions. |
-
 To release a new version to production, from an up-to-date `master` branch:
 
 ```sh
@@ -102,5 +95,7 @@ make deploy
 ```
 
 This sets the new date-based version on the web and functions, commits it, creates a `vYY.WWD.1HHMM` tag and pushes it to GitHub.
+
+The [admin](admin#readme) is not part of the Cloud Build pipeline. It has a dedicated GitHub Actions workflow ([admin-docker.yml](.github/workflows/admin-docker.yml)) that builds and pushes its Docker image only when files under `admin/` change on `master` (or when started manually). Likewise, the Cloud Build triggers ignore changes under `admin/`.
 
 Secrets are never part of this repository. The web and functions download the encrypted `settings.secret.json` from a GCS bucket at startup. The `strautomator-deploy` trigger sets the `_DEPLOY=true` and `_SETTINGS_BUCKET` substitutions, and the GCP project ID comes from Cloud Build itself, so these values are not stored in the repository.

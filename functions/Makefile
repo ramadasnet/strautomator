@@ -26,11 +26,11 @@ run: build
 	-cp -r ../core/lib/. ./node_modules/strautomator-core/lib/
 	node index.js
 
-# Encrypt settings.
+# Encrypt settings
 encrypt:
 	$(SETMEUP) encrypt ./settings.secret.json
 
-# Decrypt settings.
+# Decrypt settings
 decrypt:
 	$(SETMEUP) decrypt ./settings.secret.json
 
