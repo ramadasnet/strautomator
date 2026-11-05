@@ -1,6 +1,6 @@
 {
     "name": "strautomator-web",
-    "version": "26.453.12223",
+    "version": "26.454.11105",
     "description": "Strautomator.com website.",
     "author": "Igor Ramadas",
     "license": "AGPL-3.0-only",
@@ -23,7 +23,7 @@
     },
     "dependencies": {
         "@mdi/font": "^7.4.47",
-        "@paddle/paddle-node-sdk": "^3.10.0",
+        "@paddle/paddle-node-sdk": "^3.11.0",
         "@pinia/nuxt": "^1.0.3",
         "axios": "^1.21.0",
         "chart.js": "^4.6.1",
@@ -39,7 +39,7 @@
         "setmeup": "^2.0.0",
         "strautomator-core": "file:../core",
         "vanilla-jsoneditor": "^3.13.0",
-        "vue": "^3.5.44",
+        "vue": "^3.5.45",
         "vue-draggable-plus": "^0.6.1",
         "vue-router": "^5.4.0",
         "vuetify": "^4.3.2",

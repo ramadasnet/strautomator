@@ -2,7 +2,7 @@
     "name": "strautomator-admin",
     "private": true,
     "type": "module",
-    "version": "26.417.12111",
+    "version": "26.454.11105",
     "scripts": {
         "build": "nuxt build",
         "dev": "VITE_CJS_TRACE=true nuxt dev",
@@ -12,28 +12,28 @@
     },
     "dependencies": {
         "@mdi/font": "^7.4.47",
-        "@pinia/nuxt": "^1.0.2",
+        "@pinia/nuxt": "^1.0.3",
         "anyhow": "^4.0.0",
         "bitecache": "^2.0.0",
         "dayjs": "^1.11.23",
-        "google-auth-library": "^11.2.0",
+        "google-auth-library": "^11.3.3",
         "lodash": "^4.18.1",
-        "nuxt": "^4.6.1",
-        "nuxt-vue3-google-signin": "^0.0.13",
-        "pinia": "^4.0.3",
+        "nuxt": "^4.6.4",
+        "nuxt-vue3-google-signin": "^1.0.0",
+        "pinia": "^4.1.0",
         "strautomator-core": "file:../core",
-        "vue": "^3.5.43",
+        "vue": "^3.5.45",
         "vue-router": "^5.4.0",
         "vue3-cookies": "^1.0.6",
         "vuetify-pro-tiptap": "^3.0.0"
     },
     "devDependencies": {
-        "@types/lodash": "^4.17.26",
-        "@types/node": "^26.6.5",
-        "sass": "^1.105.1",
+        "@types/lodash": "^4.17.27",
+        "@types/node": "^26.6.6",
+        "sass": "^1.107.1",
         "typescript": "^7.0.2",
         "vite-plugin-vuetify": "^2.1.3",
-        "vuetify": "^4.2.4"
+        "vuetify": "^4.3.2"
     },
     "prettier": {
         "trailingComma": "none",
