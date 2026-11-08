@@ -1,12 +1,12 @@
 # Code Review Instructions
 
-Review the changes in this Pull Request (PR) for correctness, security, and performance. Report findings with a severity level.
+Review the changes in this pull request (PR) for correctness, security, and performance. Report findings with a severity level.
 
 ## Scope
 
 - **Focus on the code, not on the tests!** Do NOT review unit tests, test fixtures, or test helpers. Only report a test issue if it hides a real P0 / P1 bug in the code under test.
 - Do NOT review version bumps, lockfiles, generated files, README updates, or renamed files, unless they break the build or introduce a security risk.
-- Only review the changes in this PR. Do NOT report existing issues in unchanged code, unless the PR makes them worse.
+- Only review the changes in this PR. Do NOT report existing issues in unchanged code, unless the PR makes them redundant or incorrect.
 
 ## No Nitpicking
 
