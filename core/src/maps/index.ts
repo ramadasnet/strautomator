@@ -7,16 +7,22 @@ import {MapAddress, MapCoordinates} from "./types"
 import {axiosRequest} from "../axios"
 import {getTimeoutSignal} from "../timeout"
 import {AsyncResource} from "node:async_hooks"
+import {createHash} from "node:crypto"
 import Bottleneck from "bottleneck"
 import database from "../database"
 import cache from "bitecache"
-import jaul from "jaul"
 import logger from "anyhow"
 import dayjs from "../dayjs"
 import _ from "lodash"
 const axiosModule = require("axios")
 const axios = axiosModule.default || axiosModule
 const settings = require("setmeup").settings
+
+interface GeocodeCache {
+    mapCoordinates: MapCoordinates[]
+    dateCached: Date
+    dateExpiry: Date
+}
 
 /**
  * Google Maps wrapper.
@@ -37,6 +43,9 @@ export class Maps {
      * LocationIQ limiter module.
      */
     private lociqLimiter: Bottleneck
+
+    private geocodePromises = new Map<string, Map<AbortSignal | undefined, Promise<MapCoordinates[]>>>()
+    private reverseGeocodePromises = new Map<string, Map<AbortSignal | undefined, Promise<MapAddress>>>()
 
     /**
      * Polyline processor.
@@ -86,6 +95,44 @@ export class Maps {
     // --------------------------------------------------------------------------
 
     /**
+     * Share lookups only within the same cancellation scope.
+     */
+    private coalesceLookup = <T>(pending: Map<string, Map<AbortSignal | undefined, Promise<T>>>, cacheId: string, lookup: () => Promise<T>): Promise<T> => {
+        const signal = getTimeoutSignal()
+        signal?.throwIfAborted()
+        let requests = pending.get(cacheId)
+        if (!requests) {
+            requests = new Map()
+            pending.set(cacheId, requests)
+        }
+
+        let promise = requests.get(signal)
+        if (!promise) {
+            promise = Promise.resolve()
+                .then(lookup)
+                .finally(() => {
+                    requests.delete(signal)
+                    if (requests.size == 0) pending.delete(cacheId)
+                })
+            requests.set(signal, promise)
+        }
+        return promise
+    }
+
+    /**
+     * Firestore TTL deletion is asynchronous, so expiry must also be checked on reads.
+     */
+    private isCacheFresh = (cached: {dateExpiry?: Date}): boolean => !!cached?.dateExpiry && dayjs(cached.dateExpiry).valueOf() > Date.now()
+
+    /**
+     * Memory entries must not outlive the persistent result's expiry.
+     */
+    private cacheLocation = (cacheId: string, cached: {dateExpiry?: Date}): void => {
+        const ttl = Math.min(settings.maps.cacheDuration, (dayjs(cached.dateExpiry).valueOf() - Date.now()) / 1000)
+        if (ttl > 0) cache.set("maps", cacheId, cached, ttl)
+    }
+
+    /**
      * Get the geocode data for the specified address.
      * @param address Address to query the coordinates for.
      * @param region Optional TLD biasing region.
@@ -95,53 +142,59 @@ export class Maps {
         if (!provider) provider = "google"
 
         try {
-            if (!address || address.length < 3) {
+            getTimeoutSignal()?.throwIfAborted()
+            if (!address || address.trim() == "") {
                 throw new Error("Invalid or missing address")
             }
 
-            // Sanitize address and get its ID.
-            address = jaul.data.removeFromString(decodeURIComponent(address), ["%", "{", "}", "[", "]", "(", ")", "@"])
+            // Query parsing already decoded the address; preserve its punctuation.
+            address = address.normalize("NFC").trim().replace(/\s+/g, " ")
 
             // Adapt region to correct ccTLD.
+            region = region?.toLowerCase()
             if (region == "gb") {
                 region = "uk"
             }
 
-            const now = dayjs()
-            const cacheId = `${provider}-${region || "global"}-${address.replace(/[^a-z0-9–]/g, "")}`.toLowerCase()
+            const addressId = createHash("sha256").update(address.toLowerCase()).digest("hex")
+            const cacheId = `geocode-${provider}-${region || "global"}-${addressId}`
 
             // Location cached in memory?
-            const memCached = cache.get("maps", cacheId)
-            if (memCached) {
-                logger.debug("Maps.getGeocode", provider, address, region, `${memCached.length} results`, "From memory cache")
-                return memCached
+            const memCached = cache.get<GeocodeCache>("maps", cacheId)
+            if (this.isCacheFresh(memCached)) {
+                logger.debug("Maps.getGeocode", provider, address, region, `${memCached.mapCoordinates.length} results`, "From memory cache")
+                return memCached.mapCoordinates
             }
 
-            // Location cached in the database?
-            const dbCached: {mapCoordinates: MapCoordinates[]; dateCached: Date} = await database.get("maps", cacheId)
-            if (dbCached) {
-                logger.info("Maps.getGeocode", provider, address, region, `${dbCached.mapCoordinates.length} results`, `From cache: ${dayjs(dbCached.dateCached).format("lll")}`)
-                return dbCached.mapCoordinates
-            }
-
-            // Get geocoded result from the specified provider.
-            const results = provider == "google" ? await this.getGeocode_Google(address, region) : await this.getGeocode_LocationIQ(address, region)
-            if (results?.length > 0) {
-                const toCache = {
-                    mapCoordinates: results,
-                    dateCached: now.toDate(),
-                    dateExpiry: now.add(settings.maps.maxCacheDuration, "seconds").toDate()
+            return await this.coalesceLookup(this.geocodePromises, cacheId, async () => {
+                // Location cached in the database?
+                const dbCached: GeocodeCache = await database.get("maps", cacheId)
+                if (this.isCacheFresh(dbCached)) {
+                    this.cacheLocation(cacheId, dbCached)
+                    logger.info("Maps.getGeocode", provider, address, region, `${dbCached.mapCoordinates.length} results`, `From cache: ${dayjs(dbCached.dateCached).format("lll")}`)
+                    return dbCached.mapCoordinates
                 }
 
-                cache.set("maps", cacheId, results)
-                database.set("maps", toCache, cacheId)
+                // Get geocoded result from the specified provider.
+                const results = provider == "google" ? await this.getGeocode_Google(address, region) : await this.getGeocode_LocationIQ(address, region)
+                if (results?.length > 0) {
+                    const now = dayjs()
+                    const toCache: GeocodeCache = {
+                        mapCoordinates: results,
+                        dateCached: now.toDate(),
+                        dateExpiry: now.add(settings.maps.maxCacheDuration, "seconds").toDate()
+                    }
 
-                logger.info("Maps.getGeocode", provider, address, region, `${results.length} result(s)`)
-                return results
-            }
+                    await database.set("maps", toCache, cacheId)
+                    this.cacheLocation(cacheId, toCache)
 
-            logger.info("Maps.getGeocode", provider, address, region, `No results`)
-            return []
+                    logger.info("Maps.getGeocode", provider, address, region, `${results.length} result(s)`)
+                    return results
+                }
+
+                logger.info("Maps.getGeocode", provider, address, region, `No results`)
+                return []
+            })
         } catch (ex) {
             const dmsCoordinates = this.dmsToCoordinates(address)
 
@@ -221,7 +274,7 @@ export class Maps {
             const options: any = {
                 method: "GET",
                 returnResponse: true,
-                url: `${baseUrl}search?zoom=14&format=json&key=${token}&q=${address}`
+                url: `${baseUrl}search?zoom=14&format=json&key=${token}&q=${encodeURIComponent(address)}`
             }
 
             // Fetch geocode result from LocationIQ.
@@ -254,46 +307,49 @@ export class Maps {
         if (!provider) provider = "google"
 
         try {
+            getTimeoutSignal()?.throwIfAborted()
             if (!coordinates || coordinates.length != 2) {
                 throw new Error("Invalid or missing coordinates")
             }
 
-            const now = dayjs()
-
             // Cache coordinates with a precision of 1km.
             const rounder = (c) => (Math.round(c * 100) / 100).toFixed(settings.maps.cachePrecision)
-            const cacheId = `reverse-${provider}-${coordinates.map(rounder).join(".").replace(/\./g, "-").replace(/--/g, "-")}`
+            const cacheId = `reverse-${provider}-${coordinates.map(rounder).join(",")}`
             const logCoordinates = coordinates.join(", ")
 
             // Location cached in memory?
-            const memCached = cache.get("maps", cacheId)
-            if (memCached) {
+            const memCached = cache.get<MapAddress>("maps", cacheId)
+            if (this.isCacheFresh(memCached)) {
                 logger.debug("Maps.getReverseGeocode", provider, logCoordinates, this.getAddressLog(memCached), "From memory cache")
                 return memCached
             }
 
-            // Location cached in the database?
-            const dbCached: MapAddress = await database.get("maps", cacheId)
-            if (dbCached) {
-                logger.info("Maps.getReverseGeocode", provider, logCoordinates, this.getAddressLog(dbCached), `From cache: ${dayjs(dbCached.dateCached).format("lll")}`)
-                return dbCached
-            }
+            return await this.coalesceLookup(this.reverseGeocodePromises, cacheId, async () => {
+                // Location cached in the database?
+                const dbCached: MapAddress = await database.get("maps", cacheId)
+                if (this.isCacheFresh(dbCached)) {
+                    this.cacheLocation(cacheId, dbCached)
+                    logger.info("Maps.getReverseGeocode", provider, logCoordinates, this.getAddressLog(dbCached), `From cache: ${dayjs(dbCached.dateCached).format("lll")}`)
+                    return dbCached
+                }
 
-            // Get address from the specified provider.
-            const address: MapAddress = provider == "google" ? await this.getReverseGeocode_Google(coordinates) : await this.getReverseGeocode_LocationIQ(coordinates)
-            if (address) {
-                address.dateCached = now.toDate()
-                address.dateExpiry = now.add(settings.maps.maxCacheDuration, "seconds").toDate()
+                // Get address from the specified provider.
+                const address: MapAddress = provider == "google" ? await this.getReverseGeocode_Google(coordinates) : await this.getReverseGeocode_LocationIQ(coordinates)
+                if (address) {
+                    const now = dayjs()
+                    address.dateCached = now.toDate()
+                    address.dateExpiry = now.add(settings.maps.maxCacheDuration, "seconds").toDate()
 
-                cache.set("maps", cacheId, address)
-                database.set("maps", address, cacheId)
+                    await database.set("maps", address, cacheId)
+                    this.cacheLocation(cacheId, address)
 
-                logger.info("Maps.getReverseGeocode", provider, logCoordinates, this.getAddressLog(address))
-                return address
-            }
+                    logger.info("Maps.getReverseGeocode", provider, logCoordinates, this.getAddressLog(address))
+                    return address
+                }
 
-            logger.info("Maps.getReverseGeocode", provider, logCoordinates, "No results")
-            return null
+                logger.info("Maps.getReverseGeocode", provider, logCoordinates, "No results")
+                return null
+            })
         } catch (ex) {
             logger.error("Maps.getReverseGeocode", provider, coordinates, ex)
             throw ex
