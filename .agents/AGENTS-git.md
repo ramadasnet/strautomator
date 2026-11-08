@@ -6,7 +6,7 @@
 ## Pull Requests (PR)
 
 - PRs can only be opened if the repo is building successfully. If it fails to build, troubleshoot and fix the issue first.
-- PRs that involve minor code changes can be created as "ready", but complex PRs with new features or considerable changes to the codebase must always be created as "draft".
+- Complex PRs with lots of new features and many considerable changes to the codebase, which might still need tweaks, must be created as "draft". Other PRs are created as "ready to review".
 - The PR description MUST be split into the following sections: `New features`, `Breaking changes`, `Other changes`. If there are no new features or no breaking changes, do not create these sections. If only minor changes are present, use just `Changes` instead of `Other changes`.
 - If the PR is changing the frontend in a meaningful way, or if it's a small PR that has nothing but frontend updates, include a screenshot showcasing the changes. If many parts of the app are affected, you can include multiple screenshots. Make sure to delete created screenshots once they have been uploaded to the PR.
 - Do NOT expose information local dev URLs, ports, or other dev-only notes in the PR descriptions.
