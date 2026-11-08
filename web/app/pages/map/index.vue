@@ -414,8 +414,12 @@ const loadAddressLocation = async (e: {address?: string}): Promise<{lat: number;
         return {lat: parseFloat(coordinates[0]), lng: parseFloat(coordinates[1])}
     }
 
-    const [location] = await api<{latitude: number; longitude: number}[]>(`/api/maps/${user.value.id}/event-geocode`, {query: {address: e.address}})
-    return location ? {lat: location.latitude, lng: location.longitude} : null
+    try {
+        const [location] = await api<{latitude: number; longitude: number}[]>(`/api/maps/${user.value.id}/event-geocode`, {query: {address: e.address}})
+        return location ? {lat: location.latitude, lng: location.longitude} : null
+    } catch (ex) {
+        return null
+    }
 }
 
 /**

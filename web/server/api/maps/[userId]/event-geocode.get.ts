@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
     try {
         await requestValidator(event)
         const query = getQuery(event)
-        if (typeof query.address != "string" || query.address.trim() == "") {
+        if (typeof query.address != "string" || query.address.trim() == "" || query.address.length > 512) {
             throw new WebError("Invalid or missing address", 400)
         }
         const results = await maps.getGeocode(query.address, undefined, "google")
