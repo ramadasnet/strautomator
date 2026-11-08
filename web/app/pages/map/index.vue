@@ -406,26 +406,16 @@ const normalizePosition = (position: any) => ({lat: typeof position.lat == "func
 /**
  * Geocode an event address to map coordinates.
  */
-const loadAddressLocation = async (e: any) => {
-    return new Promise((resolve, reject) => {
-        if (!e.address || e.address.trim() == "") resolve(null)
+const loadAddressLocation = async (e: {address?: string}): Promise<{lat: number; lng: number} | null> => {
+    if (!e.address || e.address.trim() == "") return null
 
-        const coordinates = e.address?.toString().replace("(", "").replace(")", "").replace(/ /, "").split(",")
-        if (coordinates?.length == 2 && !isNaN(coordinates[0]) && !isNaN(coordinates[1])) {
-            return resolve({lat: parseFloat(coordinates[0]), lng: parseFloat(coordinates[1])})
-        }
+    const coordinates = e.address.replace("(", "").replace(")", "").replace(/ /, "").split(",")
+    if (coordinates.length == 2 && coordinates.every((c) => c.trim() != "" && Number.isFinite(Number(c)))) {
+        return {lat: parseFloat(coordinates[0]), lng: parseFloat(coordinates[1])}
+    }
 
-        const geocoder = new window.google.maps.Geocoder()
-        geocoder.geocode({address: e.address}, (results, status) => {
-            if (status === "OK") {
-                resolve(results[0].geometry.location)
-            } else if (status === "ZERO_RESULTS") {
-                resolve(null)
-            } else {
-                reject(status)
-            }
-        })
-    })
+    const [location] = await api<{latitude: number; longitude: number}[]>(`/api/maps/${user.value.id}/event-geocode`, {query: {address: e.address}})
+    return location ? {lat: location.latitude, lng: location.longitude} : null
 }
 
 /**
