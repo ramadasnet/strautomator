@@ -2,7 +2,7 @@
 
 Source code of [Strautomator.com](https://strautomator.com), a web app that automates your Strava activities, with features like automation recipes, GearWear mileage tracking, FTP auto-updating, calendar exports and much more.
 
-This is a monorepo with 3 modules:
+This is a monorepo with 4 main modules:
 
 | Module                        | What it is                                                                 | Runs on                          |
 | ----------------------------- | -------------------------------------------------------------------------- | -------------------------------- |
@@ -41,7 +41,7 @@ This is a monorepo with 3 modules:
 
 ## Quick start
 
-You'll need **Node.js 22.22+, 24.11+ or 26+** (26 recommended), **git**, **make**, a **Google Cloud project** with Firestore, and a **Strava API application**. The [web/SETUP.md](web/SETUP.md) guide explains how to create each of them, step by step.
+You'll need **Node.js 22.22+** (26 recommended), **git**, **make**, a **Google Cloud project** with Firestore, and a **Strava API application**. The [web/SETUP.md](web/SETUP.md) guide explains how to create each of them, step by step.
 
 **1. Clone and build the core.** The core must be installed first, as the web and functions install a copy of it. Its `npm install` also compiles it to `core/lib`.
 
