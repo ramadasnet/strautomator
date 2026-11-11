@@ -25,6 +25,9 @@ import * as logHelper from "../loghelper"
 import dayjs from "../dayjs"
 const settings = require("setmeup").settings
 
+// Queue state fields, removed once a queued activity is done.
+const queueFields = ["queued", "batch", "dateQueued", "processing", "dateProcessing", "retryCount", "timeoutCount", "webhookAction", "webhookActions"]
+
 /**
  * Strava activity processing manager.
  */
@@ -125,8 +128,8 @@ export class StravaActivityProcessing {
         const now = dayjs().utc()
 
         try {
-            if (user.suspended || !user.recipes || Object.keys(user.recipes).length == 0) {
-                logger.info("Strava.batchProcessActivities", logHelper.user(user), "User suspended or has no recipes, won't process")
+            if (this.queueBlockedReason(user) || !user.recipes || Object.keys(user.recipes).length == 0) {
+                logger.info("Strava.batchProcessActivities", logHelper.user(user), "User suspended, has no Strava tokens or no recipes, won't process")
                 return null
             }
 
@@ -532,61 +535,62 @@ export class StravaActivityProcessing {
     // --------------------------------------------------------------------------
 
     /**
+     * Returns the reason why activities from the specified user can't be queued, or null if they can.
+     * Suspended users and users without Strava tokens never have activities queued.
+     * @param user The activities owner (user).
+     */
+    queueBlockedReason = (user: UserData): string => {
+        if (user.suspended) return "User suspended"
+        if (!user.stravaTokens || (!user.stravaTokens.accessToken && !user.stravaTokens.refreshToken)) return "User has no Strava tokens"
+        return null
+    }
+
+    /**
      * Add activity to the collection of activities to be processed later.
      * @param user The activity's owner (user).
      * @param activityId The activity's unique ID.
      * @param batch Queued as part of a batch processing for old activities?
      * @param error Queued because of a processing error?
      * @param processing Flag the activity as processing (lease), so the queue only retries it once the processing timeout expires.
-     * @param webhookAction Pending webhook action (update or delete) to be replayed by the queue instead of a full processing.
+     * @param webhookAction Pending webhook action (update or delete) to be replayed by the queue, kept separate from a pending processing.
      */
     queueActivity = async (user: UserData, activityId: number, batch?: boolean, error?: any, processing?: boolean, webhookAction?: string): Promise<void> => {
-        if (user.suspended) {
-            logger.warn("Strava.queueActivity", logHelper.user(user), `User suspended, won't process activity ${activityId}`)
+        const blockedReason = this.queueBlockedReason(user)
+        if (blockedReason) {
+            logger.warn("Strava.queueActivity", logHelper.user(user), `${blockedReason}, won't queue activity ${activityId}`)
             return
         }
 
         // Add the activity to the queue to be processed on the next batch.
         // If the activity was already queued then keep the original dateQueued.
+        // Webhook actions are added to webhookActions without touching the pending processing state.
         try {
-            let activity: Partial<StravaProcessedActivity> = await database.get("activities", activityId.toString())
-            let existing = activity ? true : false
+            const id = activityId.toString()
+            const existing = await database.runTransaction(async (transaction) => {
+                const saved: StravaProcessedActivity = await transaction.get("activities", id)
+                const data: any = {id: id, userId: user.id, dateQueued: saved?.dateQueued || new Date()}
 
-            // Set processed activity defaults.
-            if (!activity) activity = {}
-            activity.id = activityId
-            activity.userId = user.id
-            activity.queued = true
-            activity.dateQueued = activity.dateQueued || new Date()
+                if (webhookAction) {
+                    data.webhookActions = _.union(saved?.webhookActions || [], [webhookAction])
+                } else {
+                    data.queued = true
+                    if (batch) data.batch = true
+                    if (error) data.error = error
+                    if (processing) {
+                        data.processing = true
+                        data.dateProcessing = new Date()
+                    }
+                }
 
-            // Part of a batch processing? Flag it.
-            if (batch) {
-                activity.batch = true
-            }
+                transaction.merge("activities", data)
+                return saved ? true : false
+            })
 
-            // Previously failed due to an error? Set it.
-            if (error) {
-                activity.error = error
-            }
-
-            if (processing) {
-                activity.processing = true
-                activity.dateProcessing = new Date()
-            }
-
-            // Pending webhook action? Set it, or clear any stale one.
-            if (webhookAction) {
-                activity.webhookAction = webhookAction
-            } else {
-                delete activity.webhookAction
-            }
-
-            await database.set("activities", activity, activityId.toString())
-
+            const logAction = webhookAction ? ` (${webhookAction})` : ""
             if (existing) {
-                logger.warn("Strava.queueActivity", logHelper.user(user), `Activity ${activityId} already queued or processed`)
+                logger.warn("Strava.queueActivity", logHelper.user(user), `Activity ${activityId}${logAction} already queued or processed`)
             } else {
-                logger.info("Strava.queueActivity", logHelper.user(user), `Activity ${activityId} queued`)
+                logger.info("Strava.queueActivity", logHelper.user(user), `Activity ${activityId}${logAction} queued`)
             }
         } catch (ex) {
             logger.error("Strava.queueActivity", logHelper.user(user), `Activity ${activityId}`, ex)
@@ -605,8 +609,7 @@ export class StravaActivityProcessing {
 
         // Get queued activities from the database.
         try {
-            const where = [["dateQueued", "<=", beforeDate]]
-            const activities: StravaProcessedActivity[] = await database.search("activities", where, "dateQueued", batchSize)
+            const activities = await this.getExpiredQueuedActivities(beforeDate, batchSize)
 
             if (activities.length > 0) {
                 logger.info("Strava.getQueuedActivities", logDate, `Batch size: ${batchSize}`, `Got ${activities.length} queued activities`)
@@ -614,8 +617,9 @@ export class StravaActivityProcessing {
             }
 
             // If no recent activities were returned, check if we have older activities as part of batch processing?
+            // Retried batch activities are excluded, as they only become due once their retry backoff is over.
             const batchWhere = [["batch", "==", true]]
-            const batchActivities = await database.search("activities", batchWhere, null, batchSize)
+            const batchActivities = (await database.search("activities", batchWhere, null, batchSize)).filter((a) => !a.retryCount && !a.timeoutCount)
 
             const batchLog = batchActivities.length > 0 ? `${batchActivities.length} batch activities` : "no queued or batch activities"
             logger.info("Strava.getQueuedActivities", logDate, `Batch size: ${batchSize}`, `Got ${batchLog}`)
@@ -625,6 +629,16 @@ export class StravaActivityProcessing {
             logger.error("Strava.getQueuedActivities", logDate, `Batch size: ${batchSize}`, ex)
             return []
         }
+    }
+
+    /**
+     * Get activities that were queued before the specified date, oldest first.
+     * @param beforeDate Only get activities that were queued before that specified date.
+     * @param batchSize Optional batch size, otherwise use the default from settings.
+     */
+    getExpiredQueuedActivities = async (beforeDate: Date, batchSize?: number): Promise<StravaProcessedActivity[]> => {
+        if (!batchSize) batchSize = settings.strava.processingQueue.batchSize
+        return database.search("activities", [["dateQueued", "<=", beforeDate]], "dateQueued", batchSize)
     }
 
     /**
@@ -638,10 +652,11 @@ export class StravaActivityProcessing {
 
         try {
             const now = dayjs()
-            const activityTimeoutMs = settings.strava.processingQueue.activityTimeout * 1000
-            const runDeadline = now.add(settings.strava.processingQueue.maxRunDuration, "seconds")
-            const processingCutDate = now.subtract(settings.strava.processingQueue.processingTimeout, "seconds").toDate()
-            const beforeDate = now.subtract(settings.strava.processingQueue.delayedSeconds, "seconds").toDate()
+            const queueSettings = settings.strava.processingQueue
+            const activityTimeoutMs = queueSettings.activityTimeout * 1000
+            const runDeadline = now.add(queueSettings.maxRunDuration, "seconds")
+            const processingCutDate = now.subtract(queueSettings.processingTimeout, "seconds").toDate()
+            const beforeDate = now.subtract(queueSettings.delayedSeconds, "seconds").toDate()
             const queuedActivities = await this.getQueuedActivities(beforeDate, batchSize)
 
             // Filter activities that are not currently being processed, or whose processing lease has
@@ -660,82 +675,76 @@ export class StravaActivityProcessing {
             const skipLog = skipped > 0 ? `, skipping ${skipped} already processing` : ""
             logger.info("Strava.processQueuedActivities", logBatchSize, `Will process ${activities.length} activities${skipLog}`)
 
-            // First we set the processing lease on queued activities to avoid double-processing.
-            for (let activity of activities) {
-                try {
-                    if (_.isNil(activity.retryCount)) {
-                        activity.retryCount = 0
-                    }
-
-                    await database.merge("activities", {id: activity.id, processing: true, dateProcessing: new Date()})
-                } catch (innerEx) {
-                    logger.error("Strava.processQueuedActivities", `Failed to set the processing flag for activity ${activity.id} from user ${activity.userId}`, innerEx)
-                }
-            }
-
-            // Now we process each of the queued activities separately, stopping
-            // once the maximum run duration is reached.
-            let activityIndex = 0
-            for (; activityIndex < activities.length; activityIndex++) {
-                const pActivity = activities[activityIndex]
-
-                // Out of budget? Leftover activities are picked up by the next run.
-                if (runDeadline.diff(dayjs()) < activityTimeoutMs) {
-                    logger.warn("Strava.processQueuedActivities", logBatchSize, `Max run duration exceeded, ${activities.length - activityIndex} activities left for the next run`)
-                    break
-                }
+            // Process each of the queued activities separately, stopping once the maximum run duration is reached.
+            for (let activityIndex = 0; activityIndex < activities.length; activityIndex++) {
+                let pActivity = activities[activityIndex]
+                let claimed = false
+                let timeoutMs = activityTimeoutMs
 
                 try {
                     if (!(pActivity.userId in usersCache)) {
                         usersCache[pActivity.userId] = await users.getById(pActivity.userId)
                     }
-                    if (!usersCache[pActivity.userId]) {
+                    const user = usersCache[pActivity.userId]
+                    if (!user) {
                         logger.warn("Strava.processQueuedActivities", `User ${pActivity.userId} not found, deleting queued activity ${pActivity.id}`)
                         await this.deleteQueuedActivity(pActivity)
                         continue
                     }
 
-                    // Pending webhook action (update / delete)? Replay the matching event
-                    // instead of a full processing, then remove it from the queue.
-                    if (pActivity.webhookAction == "update" || pActivity.webhookAction == "delete") {
-                        eventManager.emit(`Strava.activity${pActivity.webhookAction == "update" ? "Updated" : "Deleted"}`, usersCache[pActivity.userId], pActivity.id)
+                    // Suspended or no Strava tokens? Drop it straight away instead of letting it time out.
+                    const blockedReason = this.queueBlockedReason(user)
+                    if (blockedReason) {
+                        logger.warn("Strava.processQueuedActivities", logHelper.user(user), `${blockedReason}, deleting queued activity ${pActivity.id}`)
                         await this.deleteQueuedActivity(pActivity)
                         continue
                     }
 
-                    const processed = await this.processActivityWithTimeout(usersCache[pActivity.userId], pActivity, activityTimeoutMs)
+                    // Out of budget? Leftover activities are picked up by the next run.
+                    // Each activity gets the activity timeout, or whatever is left of the run budget.
+                    timeoutMs = Math.min(activityTimeoutMs, runDeadline.diff(dayjs()))
+                    if (timeoutMs < queueSettings.minActivityTimeout * 1000) {
+                        logger.warn("Strava.processQueuedActivities", logBatchSize, `Max run duration exceeded, ${activities.length - activityIndex} activities left for the next run`)
+                        break
+                    }
 
-                    // Queued activity is invalid or had no matching recipes? Delete it.
-                    if (!processed) {
-                        await this.deleteQueuedActivity(pActivity)
-                    } else {
+                    // Atomically claim the processing lease, so concurrent runs don't process the same activity.
+                    pActivity = await this.claimQueuedActivity(pActivity, processingCutDate)
+                    if (!pActivity) continue
+                    claimed = true
+
+                    // Pending processing (create webhook or batch) and / or webhook actions (update / delete)?
+                    // Legacy entries with a single webhookAction on a processed activity have no pending processing.
+                    const webhookActions = _.union(pActivity.webhookActions || [], pActivity.webhookAction ? [pActivity.webhookAction] : [])
+                    const pendingProcessing = pActivity.queued && !(pActivity.webhookAction && pActivity.dateProcessed)
+                    let processed: StravaProcessedActivity
+
+                    if (pendingProcessing && !webhookActions.includes("delete")) {
+                        processed = await this.processActivityWithTimeout(user, pActivity, timeoutMs)
+                    }
+                    for (let action of webhookActions) {
+                        eventManager.emit(`Strava.activity${action == "delete" ? "Deleted" : "Updated"}`, user, pActivity.id)
+                    }
+
+                    // Processed activities replace the queued entry. Invalid activities, or ones with no matching recipes, are deleted.
+                    if (processed) {
                         processedCount++
+                    } else if (pendingProcessing) {
+                        await this.deleteQueuedActivity({id: pActivity.id, userId: pActivity.userId, webhookAction: webhookActions.includes("delete") ? "delete" : undefined})
+                    } else {
+                        for (let action of webhookActions) {
+                            await this.clearWebhookAction(pActivity, action)
+                        }
+                        await this.updateQueuedActivity(pActivity.id, {processing: false})
                     }
                 } catch (activityEx) {
-                    if (pActivity.retryCount >= settings.strava.processingQueue.retry) {
-                        logger.warn("Strava.processQueuedActivities", `Failed to process queued activity ${pActivity.id} from user ${pActivity.userId} too many times`)
-                        await this.deleteQueuedActivity(pActivity)
-                    } else if (activityEx.isTimeout) {
-                        logger.warn("Strava.processQueuedActivities", `Activity ${pActivity.id} from user ${pActivity.userId} timed out, will retry after the processing timeout`)
-                        await database.merge("activities", {id: pActivity.id, processing: true, dateProcessing: new Date(), retryCount: pActivity.retryCount + 1})
+                    if (claimed) {
+                        await this.retryQueuedActivity(usersCache[pActivity.userId], pActivity, activityEx, timeoutMs < activityTimeoutMs)
                     } else {
-                        logger.warn("Strava.processQueuedActivities", `Failed to process queued activity ${pActivity.id} from user ${pActivity.userId}, will retry`)
-                        await database.merge("activities", {id: pActivity.id, processing: false, retryCount: pActivity.retryCount + 1})
+                        logger.error("Strava.processQueuedActivities", `Failed to process queued activity ${pActivity.id} from user ${pActivity.userId}`, activityEx)
                     }
                 }
             }
-
-            // Reset the processing flag on activities that were not attempted in this
-            // run, so they are picked up straight away by the next one.
-            await Promise.all(
-                activities.slice(activityIndex).map(async (pActivity) => {
-                    try {
-                        await database.merge("activities", {id: pActivity.id, processing: false})
-                    } catch (innerEx) {
-                        logger.error("Strava.processQueuedActivities", `Failed to reset the processing flag for activity ${pActivity.id} from user ${pActivity.userId}`, innerEx)
-                    }
-                })
-            )
 
             if (processedCount > 0) {
                 logger.info("Strava.processQueuedActivities", logBatchSize, `Processed ${processedCount} out of ${activities.length} queued activities`)
@@ -744,6 +753,156 @@ export class StravaActivityProcessing {
             }
         } catch (ex) {
             logger.error("Strava.processQueuedActivities", logBatchSize, ex)
+        }
+    }
+
+    /**
+     * Claim the processing lease of a queued activity inside a transaction. Returns the
+     * up-to-date queued activity, or null if it was processed, rescheduled or claimed meanwhile.
+     * @param activity The queued activity.
+     * @param processingCutDate Processing leases started before this date are considered expired.
+     */
+    private claimQueuedActivity = async (activity: StravaProcessedActivity, processingCutDate: Date): Promise<StravaProcessedActivity> => {
+        try {
+            return await database.runTransaction(async (transaction) => {
+                const saved: StravaProcessedActivity = await transaction.get("activities", activity.id.toString())
+                if (!saved?.dateQueued || saved.userId != activity.userId) return null
+                if (saved.dateQueued.valueOf() != activity.dateQueued?.valueOf()) return null
+                if (saved.processing && (saved.dateProcessing || saved.dateQueued) >= processingCutDate) return null
+
+                const lease = {processing: true, dateProcessing: new Date()}
+                transaction.merge("activities", {id: saved.id.toString(), ...lease})
+                return {...saved, ...lease}
+            })
+        } catch (ex) {
+            logger.error("Strava.claimQueuedActivity", `User ${activity.userId}`, `Activity ${activity.id}`, ex)
+            return null
+        }
+    }
+
+    /**
+     * Merge data into a queued activity inside a transaction, only if it's still queued,
+     * so activities processed or deleted meanwhile are not recreated. Returns true if updated.
+     * @param id The activity ID.
+     * @param data Data to be merged.
+     */
+    private updateQueuedActivity = async (id: number | string, data: any): Promise<boolean> => {
+        return database.runTransaction(async (transaction) => {
+            const saved: StravaProcessedActivity = await transaction.get("activities", id.toString())
+            if (!saved?.dateQueued) return false
+            transaction.merge("activities", {...data, id: id.toString()})
+            return true
+        })
+    }
+
+    /**
+     * Schedule a failed queued activity for retry with an exponential backoff. Errors and timeouts are counted separately,
+     * and once retries are exhausted the activity is saved with the error so it shows up on the automation history.
+     * @param user The activity's owner (user).
+     * @param pActivity The queued activity.
+     * @param ex The processing error.
+     * @param partialBudget Activity had less than the full activity timeout, so a timeout is not counted.
+     */
+    private retryQueuedActivity = async (user: UserData, pActivity: StravaProcessedActivity, ex: any, partialBudget?: boolean): Promise<void> => {
+        const queueSettings = settings.strava.processingQueue
+        const activityLog = `Activity ${pActivity.id} from user ${pActivity.userId}`
+        const message = ex.message || ex.toString()
+
+        try {
+            if (ex.isTimeout && partialBudget) {
+                logger.warn("Strava.processQueuedActivities", `${activityLog} timed out with a partial run budget, will retry on the next run`)
+                await this.updateQueuedActivity(pActivity.id, {processing: false})
+                return
+            }
+
+            const countField = ex.isTimeout ? "timeoutCount" : "retryCount"
+            const count = (pActivity[countField] || 0) + 1
+            if (count > queueSettings.retry) {
+                logger.warn("Strava.processQueuedActivities", `${activityLog} failed too many times (${countField}: ${count}): ${message}`)
+                await this.failQueuedActivity(user, pActivity, `Failed after ${count} attempts: ${message}`)
+                return
+            }
+
+            // Retried activities are moved back in the queue (dateQueued), so they only become due after the backoff.
+            const attempts = (pActivity.retryCount || 0) + (pActivity.timeoutCount || 0)
+            const backoff = queueSettings.retryBackoff[Math.min(attempts, queueSettings.retryBackoff.length - 1)]
+            const dateQueued = new Date(Date.now() + (backoff - queueSettings.delayedSeconds) * 1000)
+            logger.warn("Strava.processQueuedActivities", `${activityLog} ${ex.isTimeout ? "timed out" : "failed"}, will retry in ${backoff}s: ${message}`)
+            await this.updateQueuedActivity(pActivity.id, {processing: false, [countField]: count, error: message, dateQueued: dateQueued})
+        } catch (innerEx) {
+            logger.error("Strava.processQueuedActivities", `${activityLog} failed to schedule retry`, innerEx)
+        }
+    }
+
+    /**
+     * Save a queued activity that failed too many times as a processed activity with an error,
+     * and notify the user (except for batch processing).
+     * @param user The activity's owner (user).
+     * @param pActivity The queued activity.
+     * @param error Error message.
+     */
+    private failQueuedActivity = async (user: UserData, pActivity: StravaProcessedActivity, error: string): Promise<void> => {
+        const id = pActivity.id.toString()
+        const failed = await database.runTransaction(async (transaction) => {
+            const saved: StravaProcessedActivity = await transaction.get("activities", id)
+            if (!saved?.dateQueued) return false
+            const queueData = Object.fromEntries(queueFields.map((field) => [field, FieldValue.delete()]))
+            transaction.merge("activities", {...queueData, id: id, userId: saved.userId, dateProcessed: dayjs.utc().toDate(), error: error})
+            return true
+        })
+
+        if (failed && !pActivity.batch && user) {
+            try {
+                const title = `Failed to process activity ${pActivity.id}`
+                const body = `There was an error processing your activity ${pActivity.id}, and it could not be automated after multiple attempts.`
+                const expiry = dayjs().add(14, "days").toDate()
+                await notifications.createNotification(user, {title: title, body: body, activityId: parseInt(id), dateExpiry: expiry})
+            } catch (notifyEx) {
+                logger.warn("Strava.failQueuedActivity", `Failed creating notification for activity ${id}, from user ${pActivity.userId}`)
+            }
+        }
+    }
+
+    /**
+     * Remove a single pending webhook action from a queued activity. The activity is only deleted
+     * if nothing else is pending (processing or other webhook actions) and it was never processed.
+     * @param activity The queued activity.
+     * @param webhookAction The webhook action (update or delete) to be removed.
+     */
+    clearWebhookAction = async (activity: Pick<StravaProcessedActivity, "id" | "userId">, webhookAction: string): Promise<void> => {
+        const activityLog = `Activity ${activity.id} (${webhookAction})`
+        try {
+            const result = await database.runTransaction(async (transaction) => {
+                const id = activity.id.toString()
+                const saved: StravaProcessedActivity = await transaction.get("activities", id)
+                if (!saved) return null
+                if (saved.userId != activity.userId) throw new Error("Activity belongs to another user")
+
+                const webhookActions = (saved.webhookActions || []).filter((a) => a != webhookAction)
+                const data: any = {id, webhookActions: webhookActions.length > 0 ? webhookActions : FieldValue.delete()}
+                if (saved.webhookAction == webhookAction) data.webhookAction = FieldValue.delete()
+
+                // Still pending processing or other actions? Keep the rest of the queue state untouched.
+                if (saved.queued || webhookActions.length > 0 || (saved.webhookAction && saved.webhookAction != webhookAction)) {
+                    transaction.merge("activities", data)
+                    return "webhook action cleared"
+                }
+                if (saved.dateProcessed) {
+                    queueFields.forEach((field) => (data[field] = FieldValue.delete()))
+                    transaction.merge("activities", data)
+                    return "queue metadata cleared"
+                }
+
+                transaction.delete("activities", id)
+                return "deleted"
+            })
+
+            if (result) {
+                logger.info("Strava.clearWebhookAction", `User ${activity.userId}`, `${activityLog} ${result}`)
+            }
+        } catch (ex) {
+            logger.error("Strava.clearWebhookAction", `User ${activity.userId}`, activityLog, ex)
+            throw ex
         }
     }
 
@@ -761,7 +920,6 @@ export class StravaActivityProcessing {
                 if (saved.userId != activity.userId) throw new Error("Activity belongs to another user")
 
                 if (saved.dateProcessed && activity.webhookAction != "delete" && saved.webhookAction != "delete") {
-                    const queueFields = ["queued", "batch", "dateQueued", "processing", "dateProcessing", "retryCount", "webhookAction"]
                     transaction.merge("activities", {id, ...Object.fromEntries(queueFields.map((field) => [field, FieldValue.delete()]))})
                     return "queue metadata cleared"
                 }

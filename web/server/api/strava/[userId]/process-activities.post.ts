@@ -18,6 +18,8 @@ export default defineEventHandler(async (event) => {
         if (!body) throw new Error("Missing request body")
 
         const user = await requestValidator(event)
+        const blockedReason = strava.activityProcessing.queueBlockedReason(user)
+        if (blockedReason) throw new Error(`${blockedReason}, can't batch process activities`)
         const dateFrom = body.dateFrom ? dayjs(body.dateFrom as string).utc() : null
         const dateTo = body.dateTo ? dayjs(body.dateTo as string).utc() : null
         const filterPrivacy = body.filterPrivacy ? body.filterPrivacy : "all"
@@ -40,9 +42,8 @@ export default defineEventHandler(async (event) => {
         else if (filterType == "notRace") filter.race = false
         if (filterSport != "all") filter.sportType = filterSport
 
+        // Activities are only queued here, the scheduled queue run processes them, to stay within the request time limit.
         const activityCount = await strava.activityProcessing.batchProcessActivities(user, dateFrom.startOf("day"), dateTo.endOf("day"), filter)
-
-        await strava.activityProcessing.processQueuedActivities()
 
         return renderJson(event, {activityCount: activityCount, processed: activityCount <= settings.strava.processingQueue.batchSize})
     } catch (ex) {
