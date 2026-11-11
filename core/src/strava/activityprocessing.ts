@@ -883,7 +883,9 @@ export class StravaActivityProcessing {
                 if (saved.webhookAction == webhookAction) data.webhookAction = FieldValue.delete()
 
                 // Still pending processing or other actions? Keep the rest of the queue state untouched.
-                if (saved.queued || webhookActions.length > 0 || (saved.webhookAction && saved.webhookAction != webhookAction)) {
+                // Legacy entries with a webhookAction on a processed activity have a stale queued flag, not a pending processing.
+                const pendingProcessing = saved.queued && !(saved.webhookAction && saved.dateProcessed)
+                if (pendingProcessing || webhookActions.length > 0 || (saved.webhookAction && saved.webhookAction != webhookAction)) {
                     transaction.merge("activities", data)
                     return "webhook action cleared"
                 }
