@@ -1,6 +1,6 @@
 {
     "name": "strautomator-functions",
-    "version": "26.463.11724",
+    "version": "26.463.11727",
     "description": "Strautomator Cloud functions.",
     "author": "Igor Ramadas",
     "main": "index.js",
