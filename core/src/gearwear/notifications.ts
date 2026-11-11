@@ -81,6 +81,7 @@ export const notifyUsage = async (user: UserData, gearId: string, alerts: {compo
                         if (alertType == "PreAlert") {
                             const tip = GearWearTips[c.component.name.toLowerCase().replace(/ /g, "")] || ""
                             if (tip) block += `<br>${tip}`
+                            block += `<br>If you replace this component, you can reset its tracking by <a href="${resetLink}">clicking here</a>.`
                             block += `<br>If you wish to buy replacement parts early, check the <a href="${affiliateLink}">best deals in our affiliate stores</a>.`
                         } else {
                             block += `<br>Alert on: ${c.alertDetails}`
@@ -95,7 +96,7 @@ export const notifyUsage = async (user: UserData, gearId: string, alerts: {compo
                         userId: user.id,
                         gearId: gear.id,
                         gearName: gear.name,
-                        count: components.length == 1 ? "1 component" : `${components.length} components`,
+                        count: `${components.length} ${alertType == "Reminder" ? "reminder" : "alert"}${components.length == 1 ? "" : "s"}`,
                         components: blocks.join("<br><br>")
                     }
 

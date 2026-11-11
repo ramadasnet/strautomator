@@ -56,11 +56,18 @@ export const updateTracking = async (user: UserData, config: GearWearConfig, act
         // Usage alerts are queued here and sent in batch (one per alert type) after all activities are processed.
         const pendingAlerts: {component: GearWearComponent; alertType: "PreAlert" | "Alert" | "Reminder"}[] = []
         const queueAlert = (component: GearWearComponent, alertType: "PreAlert" | "Alert" | "Reminder"): void => {
-            if (wasNotifiedRecently(component)) {
-                logger.warn("GearWear.updateTracking", logHelper.user(user), `Gear ${config.id} - ${component.name}`, "User was notified recently, abort")
+            // Already queued on this update? Only an Alert can replace a queued PreAlert.
+            const queued = pendingAlerts.find((a) => a.component == component)
+            if (queued) {
+                if (queued.alertType == "PreAlert" && alertType == "Alert") {
+                    queued.alertType = "Alert"
+                    component.dateAlertSent = now.toDate()
+                }
                 return
             }
-            if (pendingAlerts.find((a) => a.component == component)) {
+
+            if (wasNotifiedRecently(component)) {
+                logger.warn("GearWear.updateTracking", logHelper.user(user), `Gear ${config.id} - ${component.name}`, "User was notified recently, abort")
                 return
             }
 
