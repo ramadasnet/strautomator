@@ -62,10 +62,16 @@ export default defineEventHandler(async (event) => {
 
         // Webhook events are queued before acknowledging, so they are still handled by the queue
         // if the realtime callback below fails. Creates are processed in full, while updates and
-        // deletes get their webhookAction replayed as the matching activity event.
+        // deletes are added as pending webhook actions, replayed as the matching activity event.
+        // Suspended users and users without Strava tokens are never queued.
         try {
             const user = await users.getById(userId)
-            if (user) await strava.activityProcessing.queueActivity(user, parseInt(objId), false, undefined, undefined, objAspect == "create" ? undefined : objAspect)
+            const blockedReason = user ? strava.activityProcessing.queueBlockedReason(user) : null
+            if (blockedReason) {
+                logger.warn("Routes.strava", logDetails, `${blockedReason}, won't queue`)
+            } else if (user) {
+                await strava.activityProcessing.queueActivity(user, parseInt(objId), false, undefined, undefined, objAspect == "create" ? undefined : objAspect)
+            }
         } catch (queueEx) {
             logger.error("Routes.strava", event.req.method, event.url.pathname + event.url.search, `Failed to queue activity ${objId}`, queueEx)
         }

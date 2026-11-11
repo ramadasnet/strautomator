@@ -106,7 +106,7 @@ export const cleanupQueuedActivities = async () => {
 
     try {
         const beforeDate = dayjs().subtract(settings.strava.processingQueue.maxAge, "seconds").toDate()
-        const activities = await core.strava.activityProcessing.getQueuedActivities(beforeDate)
+        const activities = await core.strava.activityProcessing.getExpiredQueuedActivities(beforeDate)
 
         for (let activity of activities) {
             await core.strava.activityProcessing.deleteQueuedActivity(activity)
