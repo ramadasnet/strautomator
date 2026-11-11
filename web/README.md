@@ -18,11 +18,11 @@ Please note that the [Core](../core) also has its own collection of settings fil
 
 ## Local setup
 
-For a complete step-by-step self-hosting guide, please read [SETUP.md](SETUP.md).
+For a complete step-by-step self-hosting guide, please read [SETUP.md](../SETUP.md).
 
 ### Local settings
 
-Make a copy of the [settings.secret.json.sample](settings.secret.json.sample) and name it `settings.secret.json`. This is where you'll store all the credentials and sensitive keys. The file stays in plain text unless you encrypt it with `$ npx setmeup encrypt settings.secret.json` (see [SETUP.md](SETUP.md) for details).
+Make a copy of the [settings.secret.json.sample](settings.secret.json.sample) and name it `settings.secret.json`. This is where you'll store all the credentials and sensitive keys. The file stays in plain text unless you encrypt it with `$ npx setmeup encrypt settings.secret.json` (see [SETUP.md](../SETUP.md) for details).
 
 For other non-sensitive data, you can create a `settings.local.json`. This file is kept in clear text on your local machine.
 
@@ -83,9 +83,9 @@ Also note that even thou this project is open source, you might need to adapt so
 Basic deployment samples are provided:
 
 - App Engine: [app.yaml](app.yaml.sample) (not tested in production).
-- VM or VPS: see the systemd and Docker instructions on [SETUP.md](SETUP.md).
+- VM or VPS: see the systemd and Docker instructions on [SETUP.md](../SETUP.md).
 - Cloud Run: the [cloudbuild.yaml](../cloudbuild.yaml) on the repository root builds the Docker image and deploys it, together with the scheduled functions, whenever a new version tag is pushed.
 
 ### Scheduled functions
 
-Please note that some features depend on scheduled functions to work. These can be found in the [functions](../functions) folder. In production they are deployed by the same Cloud Build pipeline as the web. When self-hosting, you need to deploy or schedule them yourself, see [SETUP.md](SETUP.md#scheduled-jobs).
+Please note that some features depend on scheduled functions to work. These can be found in the [functions](../functions) folder. In production they are deployed by the same Cloud Build pipeline as the web. When self-hosting, you need to deploy or schedule them yourself, see [SETUP.md](../SETUP.md#scheduled-jobs).

@@ -41,7 +41,7 @@ This is a monorepo with 4 main modules:
 
 ## Quick start
 
-You'll need **Node.js 22.22+** (26 recommended), **git**, **make**, a **Google Cloud project** with Firestore, and a **Strava API application**. The [web/SETUP.md](web/SETUP.md) guide explains how to create each of them, step by step.
+You'll need **Node.js 22.22+** (26 recommended), **git**, **make**, a **Google Cloud project** with Firestore, and a **Strava API application**. The [SETUP.md](SETUP.md) guide explains how to create each of them, step by step.
 
 **1. Clone and build the core.** The core must be installed first, as the web and functions install a copy of it. Its `npm install` also compiles it to `core/lib`.
 
@@ -83,7 +83,7 @@ When you change the core, run `make build` on the `core` folder. The `make run` 
 
 - [core/README.md](core/README.md): 3rd party services, GCP credentials, settings, database collections and storage buckets.
 - [web/README.md](web/README.md): web settings, URLs, tunnels, MCP server and server ports.
-- [web/SETUP.md](web/SETUP.md): complete self-hosting guide, from zero to production, including troubleshooting.
+- [SETUP.md](SETUP.md): complete self-hosting guide, from zero to production, including troubleshooting.
 - [functions/README.md](functions/README.md): the scheduled tasks and how to test them locally.
 
 ## Builds and deployments
