@@ -618,8 +618,17 @@ export class StravaActivityProcessing {
 
             // If no recent activities were returned, check if we have older activities as part of batch processing?
             // Retried batch activities are excluded, as they only become due once their retry backoff is over.
+            // The query is widened until enough untried entries are found, so a page full of retried entries does not hide them.
             const batchWhere = [["batch", "==", true]]
-            const batchActivities = (await database.search("activities", batchWhere, null, batchSize)).filter((a) => !a.retryCount && !a.timeoutCount)
+            const maxFetch = batchSize * 10
+            let batchActivities: StravaProcessedActivity[] = []
+            let fetchSize = batchSize
+            while (true) {
+                const batchResults = await database.search("activities", batchWhere, null, fetchSize)
+                batchActivities = batchResults.filter((a) => !a.retryCount && !a.timeoutCount).slice(0, batchSize)
+                if (batchActivities.length >= batchSize || batchResults.length < fetchSize || fetchSize >= maxFetch) break
+                fetchSize = Math.min(fetchSize * 2, maxFetch)
+            }
 
             const batchLog = batchActivities.length > 0 ? `${batchActivities.length} batch activities` : "no queued or batch activities"
             logger.info("Strava.getQueuedActivities", logDate, `Batch size: ${batchSize}`, `Got ${batchLog}`)
@@ -714,9 +723,9 @@ export class StravaActivityProcessing {
                     claimed = true
 
                     // Pending processing (create webhook or batch) and / or webhook actions (update / delete)?
-                    // Legacy entries with a single webhookAction on a processed activity have no pending processing.
+                    // Legacy entries with a single webhookAction only replay that action, as the old queue never processed them.
                     const webhookActions = _.union(pActivity.webhookActions || [], pActivity.webhookAction ? [pActivity.webhookAction] : [])
-                    const pendingProcessing = pActivity.queued && !(pActivity.webhookAction && pActivity.dateProcessed)
+                    const pendingProcessing = pActivity.queued && !pActivity.webhookAction
                     let processed: StravaProcessedActivity
 
                     if (pendingProcessing && !webhookActions.includes("delete")) {
@@ -843,13 +852,19 @@ export class StravaActivityProcessing {
      */
     private failQueuedActivity = async (user: UserData, pActivity: StravaProcessedActivity, error: string): Promise<void> => {
         const id = pActivity.id.toString()
-        const failed = await database.runTransaction(async (transaction) => {
+        const webhookActions: string[] = await database.runTransaction(async (transaction) => {
             const saved: StravaProcessedActivity = await transaction.get("activities", id)
-            if (!saved?.dateQueued) return false
+            if (!saved?.dateQueued) return null
             const queueData = Object.fromEntries(queueFields.map((field) => [field, FieldValue.delete()]))
             transaction.merge("activities", {...queueData, id: id, userId: saved.userId, dateProcessed: dayjs.utc().toDate(), error: error})
-            return true
+            return _.union(saved.webhookActions || [], saved.webhookAction ? [saved.webhookAction] : [])
         })
+        const failed = webhookActions !== null
+
+        // Replay the pending webhook actions that would otherwise be lost together with the queue metadata.
+        for (let action of webhookActions || []) {
+            eventManager.emit(`Strava.activity${action == "delete" ? "Deleted" : "Updated"}`, user, pActivity.id)
+        }
 
         if (failed && !pActivity.batch && user) {
             try {
@@ -883,8 +898,8 @@ export class StravaActivityProcessing {
                 if (saved.webhookAction == webhookAction) data.webhookAction = FieldValue.delete()
 
                 // Still pending processing or other actions? Keep the rest of the queue state untouched.
-                // Legacy entries with a webhookAction on a processed activity have a stale queued flag, not a pending processing.
-                const pendingProcessing = saved.queued && !(saved.webhookAction && saved.dateProcessed)
+                // Legacy entries with a webhookAction have a stale queued flag, not a pending processing.
+                const pendingProcessing = saved.queued && !saved.webhookAction
                 if (pendingProcessing || webhookActions.length > 0 || (saved.webhookAction && saved.webhookAction != webhookAction)) {
                     transaction.merge("activities", data)
                     return "webhook action cleared"
