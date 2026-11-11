@@ -4,6 +4,9 @@
 # trigger for version tags (v*). Builds from master and PRs never push or deploy.
 # The project ID comes from the built-in PROJECT_ID, and deployment-specific values
 # (like _SETTINGS_BUCKET) are set on the deploy trigger, so they're not public.
+# After a deploy, a JSON notification is POSTed to _DEPLOY_WEBHOOK_URL (if set), with
+# _DEPLOY_WEBHOOK_AUTH as the full Authorization header value (optional). Both are
+# also set only on the deploy trigger.
 
 substitutions:
     _DEPLOY: "false"
@@ -12,6 +15,8 @@ substitutions:
     _FUNCTIONS_REGION: europe-west1
     _FUNCTIONS_RUNTIME: nodejs22
     _SETTINGS_BUCKET: ""
+    _DEPLOY_WEBHOOK_URL: ""
+    _DEPLOY_WEBHOOK_AUTH: ""
 
 options:
     logging: CLOUD_LOGGING_ONLY
@@ -128,3 +133,60 @@ steps:
               failed=0
               for pid in $$pids; do wait $$pid || failed=1; done
               exit $$failed
+
+    - id: notify-deploy
+      name: gcr.io/cloud-builders/gcloud
+      waitFor: ["web-deploy", "functions-deploy"]
+      entrypoint: bash
+      # Values are passed as env variables, so they're never parsed as shell code.
+      env:
+          - "DEPLOY=${_DEPLOY}"
+          - "WEBHOOK_URL=${_DEPLOY_WEBHOOK_URL}"
+          - "WEBHOOK_AUTH=${_DEPLOY_WEBHOOK_AUTH}"
+          - "GCP_PROJECT=${PROJECT_ID}"
+          - "RUN_SERVICE=${_RUN_SERVICE}"
+          - "RUN_REGION=${_RUN_REGION}"
+          - "RELEASE_TAG=${TAG_NAME}"
+          - "CLOUD_BUILD_ID=${BUILD_ID}"
+      args:
+          - -c
+          - |
+              if [ "$$DEPLOY" != "true" ] || [ -z "$$WEBHOOK_URL" ]; then echo "Deploy webhook not enabled, skipping notification."; exit 0; fi
+              # Notifications must never fail the build.
+              trap 'echo "WARNING: deploy notification failed."; exit 0' ERR
+              json() {
+                  local s="$$1"
+                  s="$${s//\\/\\\\}"
+                  s="$${s//\"/\\\"}"
+                  s="$${s//$$'\n'/\\n}"
+                  s="$${s//$$'\r'/\\r}"
+                  s="$${s//$$'\t'/\\t}"
+                  printf '"%s"' "$$(printf '%s' "$$s" | tr -d '\000-\037')"
+              }
+              revisions=$$(gcloud run revisions list --service="$$RUN_SERVICE" --region="$$RUN_REGION" --sort-by=~metadata.creationTimestamp --format='value(metadata.name)' --limit=2 2>&1) || { echo "WARNING: could not list Cloud Run revisions: $$revisions"; revisions=""; }
+              newRevision=$$(printf '%s\n' "$$revisions" | sed -n 1p)
+              previousRevision=$$(printf '%s\n' "$$revisions" | sed -n 2p)
+              body=$$(printf '{"event":%s,"projectId":%s,"service":%s,"region":%s,"tag":%s,"buildId":%s,"newRevision":%s,"previousRevision":%s,"functions":%s,"buildUrl":%s}' \
+                  "$$(json deploy)" \
+                  "$$(json "$$GCP_PROJECT")" \
+                  "$$(json "$$RUN_SERVICE")" \
+                  "$$(json "$$RUN_REGION")" \
+                  "$$(json "$$RELEASE_TAG")" \
+                  "$$(json "$$CLOUD_BUILD_ID")" \
+                  "$$(json "$$newRevision")" \
+                  "$$(json "$$previousRevision")" \
+                  "$$(json deployed)" \
+                  "$$(json "https://console.cloud.google.com/cloud-build/builds;region=global/$$CLOUD_BUILD_ID?project=$$GCP_PROJECT")")
+              headers=(-H "Content-Type: application/json")
+              if [ -n "$$WEBHOOK_AUTH" ]; then headers+=(-H "Authorization: $$WEBHOOK_AUTH"); fi
+              echo "Notifying deploy webhook: new revision $$newRevision, previous $${previousRevision:-none}."
+              code=0
+              status=$$(curl -sS --max-time 20 --retry 2 -o /dev/null -w '%{http_code}' "$${headers[@]}" --data "$$body" "$$WEBHOOK_URL" 2>/dev/null) || code=$$?
+              if [ $$code -ne 0 ]; then
+                  echo "WARNING: deploy webhook request failed (curl exit code $$code, HTTP status $${status:-none})."
+              elif [ "$$status" -lt 200 ] || [ "$$status" -ge 300 ]; then
+                  echo "WARNING: deploy webhook returned HTTP status $$status."
+              else
+                  echo "Deploy webhook returned HTTP status $$status."
+              fi
+              exit 0
