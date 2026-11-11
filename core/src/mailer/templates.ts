@@ -30,64 +30,36 @@ export const EmailTemplates = {
             "</p>"
     },
 
-    // Pre alert reminder sent to user when a gear component has reached a certain % of the target usage.
+    // Pre alert reminder sent to user when gear components have reached a certain % of the target usage.
     GearWearPreAlert: {
-        subject: "${gearName} - ${component} (GearWear)",
+        subject: "${gearName} - ${count} (GearWear)",
         body:
             "<p>" +
-            "This is a friendly reminder that this component has now reached ${usage}% of its target usage.<br>-<br>" +
-            "<strong>${gearName} - ${component}</strong><br>" +
-            "Currently with ${currentDistance} ${units}, ${currentTime} hours" +
+            "This is a friendly reminder that the components below have now reached their pre-alert threshold.<br>-<br>" +
+            "${components}" +
             "</p>" +
             "<p>" +
-            "This is a good time to double check if everything is in order with the component. ${tips}" +
-            "</p>" +
-            "<p>" +
-            'If you wish to buy replacement parts early, check the <a href="${affiliateLink}">best deals in our affiliate stores</a>.' +
-            "</p>",
-        tags: {
-            tips: {
-                chain: "For instance, check the chain stretch and if all pins are rolling freely.",
-                tires: "For instance, you might want to swap the front and rear tires to better distribute their wear.",
-                cassette: "For instance, you might want to remove the cassette from the wheel to properly clean and inspect it."
-            }
-        }
+            "This is a good time to double check if everything is in order with these components." +
+            "</p>"
     },
 
-    // Alert sent to user when a gear component has passed the defined distance.
+    // Alert sent to user when gear components have passed the defined distance.
     GearWearAlert: {
-        subject: "${gearName} - ${component} (GearWear)",
+        subject: "${gearName} - ${count} (GearWear)",
         body:
             "<p>" +
-            "It's about time to replace this component!<br>-<br>" +
-            "<strong>${gearName} - ${component}</strong><br>" +
-            "Currently with ${currentDistance} ${units}, ${currentTime} hours<br>" +
-            "Alert on: ${alertDetails}<br>-" +
+            "It's about time to replace the components below!<br>-<br>" +
+            "${components}" +
             "</p>" +
             "<p>" +
-            'To reset the current tracking, please <a href="${resetLink}">click here</a> to go to the GearWear details on Strautomator. You should do this once you have replaced the component. You can also edit the component and increase the alert threshold, if needed.' +
-            "</p>" +
-            "<p>" +
-            'To buy replacement parts, check the <a href="${affiliateLink}">best deals in our affiliate stores</a>.' +
+            "You should reset the tracking once you have replaced a component. You can also edit a component and increase the alert threshold, if needed." +
             "</p>"
     },
 
-    // Reminder sent if user hasn't reset the distance on a gear component after it reaches 120% of the distance threshold.
+    // Reminder sent if user hasn't reset the distance on gear components after they reach 120% of the distance threshold.
     GearWearReminder: {
-        subject: "${gearName} - ${component} (GearWear)",
-        body:
-            "<p>" +
-            "This is a friendly reminder that you haven't reset the usage for the component below.<br>-<br>" +
-            "<strong>${gearName} - ${component}</strong><br>" +
-            "Currently with ${currentDistance} ${units}, ${currentTime} hours<br>" +
-            "Alert on: ${alertDetails}<br>-" +
-            "</p>" +
-            "<p>" +
-            'To reset the current tracking, please <a href="${resetLink}">click here</a> to go to the GearWear details on Strautomator. You should do this once you have replaced the component.' +
-            "</p>" +
-            "<p>" +
-            'To buy replacement parts, check the <a href="${affiliateLink}">best deals in our affiliate stores</a>.' +
-            "</p>"
+        subject: "${gearName} - ${count} (GearWear)",
+        body: "<p>" + "This is a friendly reminder that you haven't reset the usage for the components below.<br>-<br>" + "${components}" + "</p>"
     },
 
     // Reminder sent if GearWear components haven't been used or updated for a while.
@@ -184,4 +156,13 @@ export const EmailTemplates = {
             "<i>If you haven't registered an email with Strautomator, please ignore this email.</i>" +
             "</p>"
     }
+}
+
+/**
+ * Tips appended to the component details on GearWear pre alert emails, indexed by component name.
+ */
+export const GearWearTips = {
+    chain: "For instance, check the chain stretch and if all pins are rolling freely.",
+    tires: "For instance, you might want to swap the front and rear tires to better distribute their wear.",
+    cassette: "For instance, you might want to remove the cassette from the wheel to properly clean and inspect it."
 }

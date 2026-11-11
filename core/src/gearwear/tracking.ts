@@ -1,7 +1,7 @@
 // Strautomator Core: GearWear Tracking
 
 import {GearWearConfig, GearWearComponent} from "./types"
-import {notifyUsage} from "./notifications"
+import {notifyUsage, wasNotifiedRecently} from "./notifications"
 import {StravaActivity} from "../strava/types"
 import {isActivityIgnored} from "../strava/utils"
 import {UserData} from "../users/types"
@@ -51,6 +51,33 @@ export const updateTracking = async (user: UserData, config: GearWearConfig, act
         config.updating = true
         if (!config.recentActivities) {
             config.recentActivities = []
+        }
+
+        // Usage alerts are queued here and sent in batch (one per alert type) after all activities are processed.
+        const pendingAlerts: {component: GearWearComponent; alertType: "PreAlert" | "Alert" | "Reminder"}[] = []
+        const queueAlert = (component: GearWearComponent, alertType: "PreAlert" | "Alert" | "Reminder"): void => {
+            // Already queued on this update? Only an Alert can replace a queued PreAlert.
+            const queued = pendingAlerts.find((a) => a.component == component)
+            if (queued) {
+                if (queued.alertType == "PreAlert" && alertType == "Alert") {
+                    queued.alertType = "Alert"
+                    component.dateAlertSent = now.toDate()
+                }
+                return
+            }
+
+            if (wasNotifiedRecently(component)) {
+                logger.warn("GearWear.updateTracking", logHelper.user(user), `Gear ${config.id} - ${component.name}`, "User was notified recently, abort")
+                return
+            }
+
+            // Flag the component as notified, so following activities won't trigger another alert.
+            if (alertType == "PreAlert") {
+                component.datePreAlertSent = now.toDate()
+            } else {
+                component.dateAlertSent = now.toDate()
+            }
+            pendingAlerts.push({component: component, alertType: alertType})
         }
 
         // Iterate user activities to update the gear components distance.
@@ -141,12 +168,12 @@ export const updateTracking = async (user: UserData, config: GearWearConfig, act
                         const usagePercent = (component.currentDistance / component.alertDistance) * 100
 
                         if (!component.datePreAlertSent && component.preAlertPercent && usagePercent >= component.preAlertPercent) {
-                            await notifyUsage(user, component, activity, "PreAlert")
+                            queueAlert(component, "PreAlert")
                         } else if (component.currentDistance >= component.alertDistance) {
                             if (!component.dateAlertSent) {
-                                await notifyUsage(user, component, activity, "Alert")
+                                queueAlert(component, "Alert")
                             } else if (component.currentDistance >= reminderDistance && isReminder) {
-                                await notifyUsage(user, component, activity, "Reminder")
+                                queueAlert(component, "Reminder")
                             }
                         }
                     }
@@ -157,12 +184,12 @@ export const updateTracking = async (user: UserData, config: GearWearConfig, act
                         const usagePercent = (component.currentTime / component.alertTime) * 100
 
                         if (!component.datePreAlertSent && component.preAlertPercent && usagePercent >= component.preAlertPercent) {
-                            await notifyUsage(user, component, activity, "PreAlert")
+                            queueAlert(component, "PreAlert")
                         } else if (component.currentTime >= component.alertTime) {
                             if (!component.dateAlertSent) {
-                                await notifyUsage(user, component, activity, "Alert")
+                                queueAlert(component, "Alert")
                             } else if (component.currentTime >= reminderTime && isReminder) {
-                                await notifyUsage(user, component, activity, "Reminder")
+                                queueAlert(component, "Reminder")
                             }
                         }
                     }
@@ -194,6 +221,11 @@ export const updateTracking = async (user: UserData, config: GearWearConfig, act
 
         // Save config to the database.
         await database.set("gearwear", config, config.id)
+
+        // Send the queued usage alerts (a single email per alert type).
+        if (pendingAlerts.length > 0) {
+            await notifyUsage(user, config.id, pendingAlerts)
+        }
 
         const updatedCount = config.components.length - disabledCount
         const units = user.profile.units == "imperial" ? "mi" : "km"
