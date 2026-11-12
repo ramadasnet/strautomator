@@ -168,10 +168,18 @@ export class FitParser {
             fitFileActivity.sportProfile = messages.sportMesgs.map((sp) => (Array.isArray(sp.name) ? sp.name[0] : sp.name)).join(", ")
         }
 
-        // Add workout details.
+        // Add workout details. No workout description? Use the workout step notes (or step names) instead.
         if (messages.workoutMesgs?.length > 0) {
-            fitFileActivity.workoutName = messages.workoutMesgs.map((wk) => (Array.isArray(wk.wktName) ? wk.wktName[0] : wk.wktName)).join(", ")
-            fitFileActivity.workoutNotes = messages.workoutMesgs.map((wk) => (Array.isArray(wk.wktDescription) ? wk.wktDescription[0] : wk.wktDescription)).join(", ")
+            const getText = (value: any): string => (Array.isArray(value) ? value[0] : value)?.toString().trim()
+            const workoutName = _.compact(messages.workoutMesgs.map((wk) => getText(wk.wktName))).join(", ")
+            const stepNotes = _.compact((messages.workoutStepMesgs || []).map((st) => getText(st.notes) || getText(st.wktStepName))).join("\n")
+            const workoutNotes = _.compact(messages.workoutMesgs.map((wk) => getText(wk.wktDescription))).join(", ") || stepNotes
+            if (workoutName) {
+                fitFileActivity.workoutName = workoutName
+            }
+            if (workoutNotes) {
+                fitFileActivity.workoutNotes = workoutNotes
+            }
         }
 
         // Activity name not known beforehand? Try using the workout or the sport profile name.
@@ -223,6 +231,11 @@ export class FitParser {
                 }
                 return _.omitBy(split, (v) => _.isNil(v))
             })
+        }
+
+        // Structured workout splits without the workout message, likely a FIT file filtered by Garmin.
+        if (!messages.workoutMesgs?.length && messages.splitMesgs?.some((s) => s.splitType?.toString().startsWith("interval"))) {
+            logger.info("FitParser.parse", logHelper.user(user), fitFileActivity.id, "Workout splits found but no workout message (file filtered by Garmin?)")
         }
 
         // Device laps (lap button or auto lap, such as every 1 km). These are not
@@ -355,12 +368,12 @@ export class FitParser {
             // Make sure activity is the correct one by validating the total time.
             let minTime = activity.totalTime - 60
             let maxTime = activity.totalTime + 60
-            let result = fitActivities.find((a) => a.totalTime >= minTime && a.totalTime <= maxTime)
+            let result = this.getRichestActivity(fitActivities.filter((a) => a.totalTime >= minTime && a.totalTime <= maxTime))
 
             if (!result) {
                 minTime -= 300
                 maxTime += 300
-                result = fitActivities.find((a) => a.totalTime >= minTime && a.totalTime <= maxTime)
+                result = this.getRichestActivity(fitActivities.filter((a) => a.totalTime >= minTime && a.totalTime <= maxTime))
                 if (result) {
                     logger.warn("FitParser.getMatchingActivity", logHelper.user(user), source, logHelper.activity(activity), `Total time discrepancy (Strava ${activity.totalTime}, FIT ${result.totalTime})`)
                 }
@@ -417,8 +430,7 @@ export class FitParser {
                 for (let activity of chunk) {
                     const activityDate = dayjs(activity.dateStart)
                     const candidates = fitActivities.filter((a) => Math.abs(dayjs(a.dateStart).diff(activityDate, "seconds")) <= 60)
-                    const match =
-                        candidates.find((a) => Math.abs(a.totalTime - activity.totalTime) <= 60) || candidates.find((a) => Math.abs(a.totalTime - activity.totalTime) <= 360)
+                    const match = this.getRichestActivity(candidates.filter((a) => Math.abs(a.totalTime - activity.totalTime) <= 60)) || this.getRichestActivity(candidates.filter((a) => Math.abs(a.totalTime - activity.totalTime) <= 360))
                     if (match) {
                         result[activity.id] = match
                     }
@@ -478,6 +490,16 @@ export class FitParser {
 
     // HELPERS
     // --------------------------------------------------------------------------
+
+    /**
+     * Pick the FIT activity with the richest data out of matching candidates for the same activity:
+     * uploaded original FIT files first (the API files might be missing data), then the ones
+     * having a workout name, otherwise keep the original order.
+     * @param candidates The matching FIT activities.
+     */
+    private getRichestActivity = (candidates: FitFileActivity[]): FitFileActivity => {
+        return _.sortBy(candidates, (a) => (/^(activity-)?upload-/.test(a.id?.toString()) ? 0 : a.workoutName ? 1 : 2))[0]
+    }
 
     /**
      * Get a friendly device string based on the provided device info message.
