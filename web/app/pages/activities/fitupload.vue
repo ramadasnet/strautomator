@@ -19,6 +19,7 @@
 
                 <ul class="ml-0 pl-4 pb-0 mb-4 mt-4">
                     <li>Export the FIT files from Garmin Connect or from the Wahoo app, and put them all in a single ZIP archive.</li>
+                    <li>The Garmin API strips structured workout names from the activity files, so uploading the original files exported from Garmin Connect brings them back.</li>
                     <li>Up to {{ maxFiles }} FIT files per archive, with a maximum archive size of {{ maxSizeMB }}MB.</li>
                     <li>Files are extracted and processed one by one, so bigger archives simply take longer.</li>
                     <li>The parsed FIT data will be deleted from our database after some days.</li>
