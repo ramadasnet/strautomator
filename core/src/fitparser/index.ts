@@ -368,12 +368,13 @@ export class FitParser {
             // Make sure activity is the correct one by validating the total time.
             let minTime = activity.totalTime - 60
             let maxTime = activity.totalTime + 60
-            let result = this.getRichestActivity(fitActivities.filter((a) => a.totalTime >= minTime && a.totalTime <= maxTime))
+            const inTimeRange = (a: FitFileActivity) => a.totalTime >= minTime && a.totalTime <= maxTime
+            let result = this.getRichestActivity(fitActivities.filter(inTimeRange))
 
             if (!result) {
                 minTime -= 300
                 maxTime += 300
-                result = this.getRichestActivity(fitActivities.filter((a) => a.totalTime >= minTime && a.totalTime <= maxTime))
+                result = this.getRichestActivity(fitActivities.filter(inTimeRange))
                 if (result) {
                     logger.warn("FitParser.getMatchingActivity", logHelper.user(user), source, logHelper.activity(activity), `Total time discrepancy (Strava ${activity.totalTime}, FIT ${result.totalTime})`)
                 }
@@ -430,7 +431,8 @@ export class FitParser {
                 for (let activity of chunk) {
                     const activityDate = dayjs(activity.dateStart)
                     const candidates = fitActivities.filter((a) => Math.abs(dayjs(a.dateStart).diff(activityDate, "seconds")) <= 60)
-                    const match = this.getRichestActivity(candidates.filter((a) => Math.abs(a.totalTime - activity.totalTime) <= 60)) || this.getRichestActivity(candidates.filter((a) => Math.abs(a.totalTime - activity.totalTime) <= 360))
+                    const inTimeRange = (seconds: number) => candidates.filter((a) => Math.abs(a.totalTime - activity.totalTime) <= seconds)
+                    const match = this.getRichestActivity(inTimeRange(60)) || this.getRichestActivity(inTimeRange(360))
                     if (match) {
                         result[activity.id] = match
                     }
