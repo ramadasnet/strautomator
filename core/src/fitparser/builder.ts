@@ -36,6 +36,7 @@ const FIT_MESG_NUM = {
     EVENT: 21,
     DEVICE_INFO: 23,
     WORKOUT: 26,
+    WORKOUT_STEP: 27,
     SPORT: 12,
     RECORD: 20,
     LAP: 19,
@@ -339,7 +340,7 @@ export function encodeFitFile(activity: StravaActivity, streams: StravaRawActivi
     encoder.writeFileCreatorMessage(activity)
     encoder.writeDeviceInfoMessage(activity, startTimestamp)
     encoder.writeSportMessage(activity.name, sport, subSport)
-    encoder.writeWorkoutMessage(activity.name, sport)
+    encoder.writeWorkoutMessage(activity.name || "Strava activity", sport)
     encoder.writeEventMessage(startTimestamp, FIT_EVENT.TIMER, FIT_EVENT_TYPE.START)
 
     // Record messages (data points).
@@ -442,7 +443,7 @@ function degreesToSemicircles(degrees: number): number {
 /**
  * FIT file encoder class.
  */
-class FitEncoder {
+export class FitEncoder {
     private buffer: number[] = []
     private definitionCache: Map<string, number> = new Map()
     private fieldDefinitions: Map<number, {fieldNum: number; size: number; baseType: number}[]> = new Map()
@@ -519,20 +520,51 @@ class FitEncoder {
     }
 
     /**
-     * Write workout message with activity name as wkt_name field.
+     * Write workout message with the name and an optional description.
      */
-    writeWorkoutMessage(name: string, sport: number): void {
-        const maxNameLength = 64
-        const truncatedName = name ? name.substring(0, maxNameLength - 1) : "Strava activity"
-        const nameBytes = Buffer.from(truncatedName + "\0", "utf8")
-        const nameLength = Math.min(nameBytes.length, maxNameLength)
+    writeWorkoutMessage(name: string, sport: number, description?: string): void {
+        const fields: {fieldNum: number; size: number; baseType: number}[] = [
+            {fieldNum: 4, size: 1, baseType: FIT_BASE_TYPE.ENUM} // sport
+        ]
+        const strings: Buffer[] = []
 
-        const localMesgType = this.defineMessage(FIT_MESG_NUM.WORKOUT, [
-            {fieldNum: 4, size: 1, baseType: FIT_BASE_TYPE.ENUM}, // sport
-            {fieldNum: 8, size: nameLength, baseType: FIT_BASE_TYPE.STRING} // wkt_name
-        ])
+        if (name) {
+            const nameBytes = Buffer.from(name.substring(0, 63) + "\0", "utf8")
+            fields.push({fieldNum: 8, size: nameBytes.length, baseType: FIT_BASE_TYPE.STRING}) // wkt_name
+            strings.push(nameBytes)
+        }
+        if (description) {
+            const descriptionBytes = Buffer.from(description.substring(0, 255) + "\0", "utf8")
+            fields.push({fieldNum: 17, size: descriptionBytes.length, baseType: FIT_BASE_TYPE.STRING}) // wkt_description
+            strings.push(descriptionBytes)
+        }
 
-        this.writeDataMessageWithString(localMesgType, [sport], nameBytes.subarray(0, nameLength))
+        const localMesgType = this.defineMessage(FIT_MESG_NUM.WORKOUT, fields)
+        this.writeDataMessageWithString(localMesgType, [sport], Buffer.concat(strings))
+    }
+
+    /**
+     * Write workout step message with an optional name and notes.
+     */
+    writeWorkoutStepMessage(index: number, name?: string, notes?: string): void {
+        const fields: {fieldNum: number; size: number; baseType: number}[] = [
+            {fieldNum: 254, size: 2, baseType: FIT_BASE_TYPE.UINT16} // message_index
+        ]
+        const strings: Buffer[] = []
+
+        if (name) {
+            const nameBytes = Buffer.from(name.substring(0, 63) + "\0", "utf8")
+            fields.push({fieldNum: 0, size: nameBytes.length, baseType: FIT_BASE_TYPE.STRING}) // wkt_step_name
+            strings.push(nameBytes)
+        }
+        if (notes) {
+            const notesBytes = Buffer.from(notes.substring(0, 255) + "\0", "utf8")
+            fields.push({fieldNum: 8, size: notesBytes.length, baseType: FIT_BASE_TYPE.STRING}) // notes
+            strings.push(notesBytes)
+        }
+
+        const localMesgType = this.defineMessage(FIT_MESG_NUM.WORKOUT_STEP, fields)
+        this.writeDataMessageWithString(localMesgType, [index], Buffer.concat(strings))
     }
 
     /**

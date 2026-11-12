@@ -170,8 +170,29 @@ export class FitParser {
 
         // Add workout details.
         if (messages.workoutMesgs?.length > 0) {
-            fitFileActivity.workoutName = messages.workoutMesgs.map((wk) => (Array.isArray(wk.wktName) ? wk.wktName[0] : wk.wktName)).join(", ")
-            fitFileActivity.workoutNotes = messages.workoutMesgs.map((wk) => (Array.isArray(wk.wktDescription) ? wk.wktDescription[0] : wk.wktDescription)).join(", ")
+            const workoutName = messages.workoutMesgs.map((wk) => (Array.isArray(wk.wktName) ? wk.wktName[0] : wk.wktName)).join(", ")
+            let workoutNotes = messages.workoutMesgs.map((wk) => (Array.isArray(wk.wktDescription) ? wk.wktDescription[0] : wk.wktDescription)).join(", ")
+
+            // Workout has no description? Build the notes out of the step notes and names.
+            if (!workoutNotes.trim() && messages.workoutStepMesgs?.length > 0) {
+                workoutNotes = messages.workoutStepMesgs
+                    .map((step) => [step.notes, step.wktStepName].flat().find((v) => v?.toString().trim()))
+                    .filter((stepNote) => stepNote)
+                    .join("\n")
+            }
+
+            if (workoutName.trim()) {
+                fitFileActivity.workoutName = workoutName
+            }
+            if (workoutNotes.trim()) {
+                fitFileActivity.workoutNotes = workoutNotes
+            }
+        }
+
+        // Files served by the Garmin API keep the interval splits but have the workout
+        // messages filtered out, so this helps identifying them.
+        if (!messages.workoutMesgs?.length && messages.splitMesgs?.some((s) => s.splitType?.toString().startsWith("interval"))) {
+            logger.info("FitParser.parse", logHelper.user(user), fitFileActivity.id, "Workout splits found but no workout message (file filtered by Garmin?)")
         }
 
         // Activity name not known beforehand? Try using the workout or the sport profile name.
@@ -355,12 +376,13 @@ export class FitParser {
             // Make sure activity is the correct one by validating the total time.
             let minTime = activity.totalTime - 60
             let maxTime = activity.totalTime + 60
-            let result = fitActivities.find((a) => a.totalTime >= minTime && a.totalTime <= maxTime)
+            const inTimeRange = (a: FitFileActivity) => a.totalTime >= minTime && a.totalTime <= maxTime
+            let result = this.preferredMatch(fitActivities.filter(inTimeRange))
 
             if (!result) {
                 minTime -= 300
                 maxTime += 300
-                result = fitActivities.find((a) => a.totalTime >= minTime && a.totalTime <= maxTime)
+                result = this.preferredMatch(fitActivities.filter(inTimeRange))
                 if (result) {
                     logger.warn("FitParser.getMatchingActivity", logHelper.user(user), source, logHelper.activity(activity), `Total time discrepancy (Strava ${activity.totalTime}, FIT ${result.totalTime})`)
                 }
@@ -417,8 +439,8 @@ export class FitParser {
                 for (let activity of chunk) {
                     const activityDate = dayjs(activity.dateStart)
                     const candidates = fitActivities.filter((a) => Math.abs(dayjs(a.dateStart).diff(activityDate, "seconds")) <= 60)
-                    const match =
-                        candidates.find((a) => Math.abs(a.totalTime - activity.totalTime) <= 60) || candidates.find((a) => Math.abs(a.totalTime - activity.totalTime) <= 360)
+                    const inTimeRange = (seconds: number) => candidates.filter((a) => Math.abs(a.totalTime - activity.totalTime) <= seconds)
+                    const match = this.preferredMatch(inTimeRange(60)) || this.preferredMatch(inTimeRange(360))
                     if (match) {
                         result[activity.id] = match
                     }
@@ -478,6 +500,16 @@ export class FitParser {
 
     // HELPERS
     // --------------------------------------------------------------------------
+
+    /**
+     * Pick the best candidate out of the FIT file activities matching the date and time
+     * filters. Files uploaded by the user are preferred (they keep the workout metadata
+     * that the API files lack), then ones having a workout name, then the first result.
+     * @param candidates The FIT file activities matching the filters.
+     */
+    private preferredMatch = (candidates: FitFileActivity[]): FitFileActivity => {
+        return candidates.find((a) => a.id?.toString().includes("upload-")) || candidates.find((a) => a.workoutName) || candidates[0]
+    }
 
     /**
      * Get a friendly device string based on the provided device info message.
