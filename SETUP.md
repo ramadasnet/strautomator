@@ -15,8 +15,9 @@ This guide walks you through getting your own Strautomator instance running, eit
 7. [Create your settings files](#7-create-your-settings-files)
 8. [Run it locally](#8-run-it-locally)
 9. [Run it on a VPS (production mode)](#9-run-it-on-a-vps-production-mode)
-10. [Troubleshooting](#10-troubleshooting)
-11. [Updating](#11-updating)
+10. [(Optional) Run the Admin panel](#10-optional-run-the-admin-panel)
+11. [Troubleshooting](#11-troubleshooting)
+12. [Updating](#12-updating)
 
 ---
 
@@ -38,6 +39,7 @@ Everything lives in the [ramadasnet/strautomator](https://github.com/ramadasnet/
 - **`web/`** (this folder) is the website and API.
 - **`core/`** has most of the business logic and its own default settings. It is installed as a local npm dependency of the web (`file:../core`).
 - **`functions/`** has scheduled jobs for production. You don't need them for a local setup. See [section 9](#scheduled-jobs) for details.
+- **`admin/`** is an optional internal admin panel to manage users, subscriptions, gear, announcements, notifications and emails. It also runs on top of the core and talks to the same Firestore database. See [section 10](#10-optional-run-the-admin-panel).
 
 The database is always **Google Cloud Firestore**, even if you run the app on a VPS somewhere else. You need a Google Cloud project, but the free tier is enough for personal use.
 
@@ -62,6 +64,7 @@ Your folder should look like this:
 
 ```
 ~/strautomator/
+├── admin/
 ├── core/
 ├── functions/
 └── web/
@@ -77,6 +80,8 @@ make build
 cd ~/strautomator/web
 npm install
 ```
+
+If you also want the [Admin panel](#10-optional-run-the-admin-panel), run `npm install` in `~/strautomator/admin` too. It installs its own copy of the core, the same way the web does.
 
 > **Using the `make update` when self-hosting.** It's a maintainer command. It needs `npm-check-updates` installed globally, bumps nearly every dependency to its latest version, and changes the package version. Use plain `npm install` to get the known-good dependency versions when installing the system on your "production" environment.
 
@@ -125,7 +130,7 @@ This command prints a random `https://<something>.trycloudflare.com` URL. **The 
 
 ### Option C: Your own reverse proxy (nginx, Caddy, Traefik...) without Cloudflare
 
-This works, but you **must** set `api.requireCloudflare` to `false`. Otherwise every `/api`, `/auth` and `/mcp` request fails with _401 Access denied_. See [Troubleshooting](#10-troubleshooting). Also set `app.tunnel` to `false`.
+This works, but you **must** set `api.requireCloudflare` to `false`. Otherwise every `/api`, `/auth` and `/mcp` request fails with _401 Access denied_. See [Troubleshooting](#11-troubleshooting). Also set `app.tunnel` to `false`.
 
 ### Option D: localhost only
 
@@ -525,7 +530,139 @@ Development mode runs several jobs inside the app: delayed activity processing (
   */5 * * * * curl -fsS "https://strautomator.example.com/api/strava/webhook/<strava.api.urlToken>/process-activity-queue" > /dev/null
   ```
 
-## 10. Troubleshooting
+## 10. (Optional) Run the Admin panel
+
+The [admin](admin) folder has an internal admin panel to manage users (grant or revoke PRO, edit, delete), subscriptions, GearWear, calendars, announcements and notifications, and to send emails. Every change is saved to an audit log. You don't need it to use Strautomator, but it saves you from editing Firestore documents by hand.
+
+It's a Nuxt single-page app with its own Nitro server, which starts the core just like the web does. It reads and writes the **same Firestore database**, but it doesn't create Strava webhooks or run scheduled jobs, so it can run next to the web. Sign-in is done with your Google account, and only the emails you allow can use it. See the [admin README](admin/README.md) for the full list of features and API endpoints.
+
+> **Keep it private.** The admin panel has full access to your users' data. Don't expose it to the internet: run it on `localhost`, reach it through an SSH tunnel, or put it behind [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/). Also set the IP allowlist described below.
+
+### 10.1 Create a Google Sign-In client ID
+
+The admin uses [Sign in with Google](https://developers.google.com/identity/gsi/web/guides/overview). You can create the client in the same Google Cloud project you created in [5.1](#51-google-cloud-platform-required).
+
+1. Open https://console.cloud.google.com/auth/overview and click **Get started**, if the Google Auth Platform isn't configured yet:
+   - **App name**: anything, for example `My Strautomator Admin`.
+   - **Support email** and **Contact information**: your email.
+   - **Audience**: **External** (or **Internal** if your project belongs to a Google Workspace organization).
+2. If you chose **External**, open **Audience** and add your Google account under **Test users**. While the app is in _Testing_ mode, only test users can sign in, which is exactly what you want for an admin panel.
+3. Open **Clients** (https://console.cloud.google.com/auth/clients), then click **Create client**:
+   - **Application type**: **Web application**.
+   - **Name**: anything, for example `strautomator-admin`.
+   - **Authorized JavaScript origins**: every URL you'll open the admin from, without a trailing slash. For local development add **both** `http://localhost` and `http://localhost:3001`. For a server, add its HTTPS URL, for example `https://admin.strautomator.example.com`.
+   - **Authorized redirect URIs**: leave empty.
+4. Copy the **Client ID**, for example `1234567890-abc123.apps.googleusercontent.com`. You don't need the client secret.
+
+> Google only accepts `https://` origins, with the exception of `http://localhost`. You can't sign in over plain HTTP using a LAN IP like `http://192.168.1.10:3001`. Changes to the origins can take a few minutes to apply.
+
+### 10.2 Settings and environment variables
+
+The admin needs two kinds of configuration.
+
+**a) Core settings (`admin/settings.secret.json`).** The core loads its settings from the folder the app runs in, so the admin needs its own `settings.secret.json`. It must point to the same database as the web, with the same `gcp.projectId`, `database.crypto.key` / `iv` and bucket names. The simplest way is to copy the web file, and to copy it again whenever you change it:
+
+```sh
+cp ~/strautomator/web/settings.secret.json ~/strautomator/admin/settings.secret.json
+```
+
+The admin's own [settings.json](admin/settings.json) already disables the modules it doesn't need (AI, Garmin, Last.fm, Maps, OpenRouter, PayPal, Spotify and Wahoo). Paddle isn't disabled there, so keep `"paddlewrapper": {"disabled": true}` in the secret file unless you have configured Paddle. If the web file is encrypted, set the same `SMU_CRYPTO_KEY` when you run the admin. In development, the GCP key is found at `~/gcp-strautomator.json` (or `admin/gcp-strautomator.json`), same as the web.
+
+**b) Admin access (`admin/.env`).** The allowed emails, the Google client ID and the IP allowlist are Nuxt runtime settings, not SetMeUp settings. Set them as environment variables, or in an `admin/.env` file (git-ignored):
+
+```sh
+# Google accounts allowed to sign in, comma-separated.
+NUXT_PUBLIC_AUTH_EMAILS=you@gmail.com
+# Client ID from step 10.1.
+NUXT_PUBLIC_GOOGLE_SIGN_IN_CLIENT_ID=1234567890-abc123.apps.googleusercontent.com
+# Client IPs allowed to open the admin, comma-separated. Leave empty to allow all IPs.
+NUXT_ADMIN_ALLOWED_IPS=127.0.0.1,::1
+# Proxies allowed to set X-Forwarded-For (cloudflared, nginx...). Only needed behind a reverse proxy.
+NUXT_ADMIN_TRUSTED_PROXIES=
+```
+
+| Variable                               | Required | Notes                                                                                                                                                                                                                        |
+| -------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NUXT_PUBLIC_AUTH_EMAILS`              | yes      | The default is a dummy `admin@example.com`, so nobody can sign in until you set it.                                                                                                                                          |
+| `NUXT_PUBLIC_GOOGLE_SIGN_IN_CLIENT_ID` | yes      | Used by the sign-in button and by the server to verify the Google ID tokens.                                                                                                                                                 |
+| `NUXT_ADMIN_ALLOWED_IPS`               | no       | Checked on every page and API request, before the Google sign-in.                                                                                                                                                            |
+| `NUXT_ADMIN_TRUSTED_PROXIES`           | no       | Behind a reverse proxy or tunnel, every request seems to come from the proxy. Add the proxy IPs here (for example `127.0.0.1,::1` for a local `cloudflared` or nginx), so the real client IP is read from `X-Forwarded-For`. |
+
+### 10.3 Run it locally
+
+The web dev server already uses port 3000, so run the admin on another port, for example 3001:
+
+```sh
+cd ~/strautomator/admin
+PORT=3001 make run
+```
+
+Like the web, `make run` copies `../core/lib` and `../core/settings*.json` into `node_modules/strautomator-core` before it starts the Nuxt dev server. Open http://localhost:3001, click **Sign in with Google**, and choose an allowed account.
+
+- The dev server always runs with `NODE_ENV=development`, so the admin uses the `-dev` collections, the same data as a web instance running with `make run`. To manage a production instance, run a production build of the admin (see below).
+- On macOS, if the dev server fails with `Vite Node IPC socket path not configured`, run it with `TMPDIR=/tmp PORT=3001 make run`.
+
+### 10.4 Run it on a VPS (production mode)
+
+Build it once, then serve the build. `make serve` loads `admin/.env`, so you can put `NODE_ENV=production` and `PORT` there too:
+
+```sh
+cd ~/strautomator/admin
+npm install
+npm run build                  # build into ./.output
+
+export NODE_ENV=production
+export GOOGLE_APPLICATION_CREDENTIALS=/home/strautomator/gcp-strautomator.json
+PORT=3001 make serve
+```
+
+In production the admin listens on port 3000 by default, and the web on 8080, so they don't clash. Use `PORT` anyway if something else uses port 3000. The production requirements from [9.1](#91-differences-in-production) apply here too: you must set `GOOGLE_APPLICATION_CREDENTIALS` and the `database.crypto` settings, and `settings.local.json` is ignored.
+
+To keep it running with systemd, create a second unit, for example `/etc/systemd/system/strautomator-admin.service`:
+
+```ini
+[Unit]
+Description=Strautomator Admin
+After=network-online.target
+
+[Service]
+User=strautomator
+WorkingDirectory=/home/strautomator/strautomator/admin
+Environment=NODE_ENV=production
+Environment=PORT=3001
+Environment=GOOGLE_APPLICATION_CREDENTIALS=/home/strautomator/gcp-strautomator.json
+# The NUXT_* access settings are loaded from admin/.env.
+ExecStart=/usr/bin/node --env-file-if-exists=.env .output/server/index.mjs
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl enable --now strautomator-admin
+```
+
+Then reach it with an SSH tunnel (`ssh -L 3001:localhost:3001 you@your-vps`, then open http://localhost:3001), or publish it on its own hostname behind Cloudflare Access. If you publish it through `cloudflared` or another reverse proxy on the same machine, set `NUXT_ADMIN_TRUSTED_PROXIES=127.0.0.1,::1` and add your own public IP to `NUXT_ADMIN_ALLOWED_IPS`. Don't forget to add the public URL to the **Authorized JavaScript origins** ([10.1](#101-create-a-google-sign-in-client-id)).
+
+**Docker (alternative).** The image must be built from the repository root, as it bundles the local `core/` folder. The admin's `settings.secret.json` and `.env` are not copied into the image, so mount the secret file and pass the variables with `-e`:
+
+```sh
+cd ~/strautomator
+docker build -f admin/Dockerfile -t strautomator-admin .
+docker run -d --name strautomator-admin -p 127.0.0.1:3001:3000 \
+    -e GOOGLE_APPLICATION_CREDENTIALS=/secrets/gcp.json \
+    -e NUXT_PUBLIC_AUTH_EMAILS=you@gmail.com \
+    -e NUXT_PUBLIC_GOOGLE_SIGN_IN_CLIENT_ID=1234567890-abc123.apps.googleusercontent.com \
+    -v ~/gcp-strautomator.json:/secrets/gcp.json:ro \
+    -v "$PWD/admin/settings.secret.json":/app/settings.secret.json:ro \
+    strautomator-admin
+```
+
+Inside the container, requests come from the Docker network gateway (usually `172.17.0.1`), not from your own IP. Binding the port to `127.0.0.1` as above already keeps the admin private to the host, so either leave `NUXT_ADMIN_ALLOWED_IPS` empty, or set it to the gateway IP. The image has a built-in healthcheck on `/healthz`.
+
+## 11. Troubleshooting
 
 To see more detail on any problem, set `"app": {"debug": true}` in `settings.local.json` (development) or `SMU_app_debug=true` (production).
 
@@ -589,14 +726,28 @@ To see more detail on any problem, set `"app": {"debug": true}` in `settings.loc
 | `Tunnel Closed with code 1`                    | `.cloudflared/config.yml` or `credentials.json` is missing or wrong       | Redo [Option A](#option-a-named-cloudflare-tunnel-recommended), or run `./tunnel` by hand to see the error. |
 | Cloudflare error `1033` / `502` in the browser | Tunnel is up but the app isn't running, or it's listening on another port | Check that the `ingress` port matches the app port (3000 in development, 8080 in production).               |
 
-## 11. Updating
+### Admin panel errors
+
+| Symptom                                                                              | Cause                                                                                    | Fix                                                                                                                                                                                                             |
+| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `403 - IP not allowed` page; logs show `Auth <ip> IP not allowed`                    | Your IP isn't in `NUXT_ADMIN_ALLOWED_IPS`                                                | Add the IP from the log line. If it's the IP of your proxy or Docker gateway, add it to `NUXT_ADMIN_TRUSTED_PROXIES` instead (or to the allowlist, for Docker).                                                 |
+| Google shows `Error 400: origin_mismatch` or `The given origin is not allowed`       | The admin URL isn't an authorized JavaScript origin                                      | Add the exact origin (scheme, host and port) to the client ([10.1](#101-create-a-google-sign-in-client-id)), then wait a few minutes. For localhost, add both `http://localhost` and `http://localhost:<port>`. |
+| Google shows `Error 403: access_denied`                                              | The OAuth app is in _Testing_ mode and your account isn't a test user                    | Add your account under **Audience** > **Test users**.                                                                                                                                                           |
+| `Failed to authenticate user` after choosing a Google account                        | The email isn't in `NUXT_PUBLIC_AUTH_EMAILS`, or it's still the dummy default            | Set `NUXT_PUBLIC_AUTH_EMAILS` and restart the admin.                                                                                                                                                            |
+| Sent back to the login page; logs show `Failed to verify token`                      | Wrong or missing `NUXT_PUBLIC_GOOGLE_SIGN_IN_CLIENT_ID`, or the ID token expired         | Check the client ID and sign in again.                                                                                                                                                                          |
+| Startup fails with `Missing the mandatory gcp.projectId setting` or `paddle.api.key` | No `admin/settings.secret.json`, or it lacks the module flags                            | Copy the web file ([10.2](#102-settings-and-environment-variables)).                                                                                                                                            |
+| The admin starts but shows no users                                                  | It uses another database or environment than the web (`-dev` collections vs. production) | Use the same `gcp.projectId`, and run both in the same mode. `make run` always uses development.                                                                                                                |
+| `EADDRINUSE :::3000` or the admin opens on another port                              | The web dev server already uses port 3000                                                | Start it with `PORT=3001 make run`.                                                                                                                                                                             |
+
+## 12. Updating
 
 ```sh
 cd ~/strautomator && git pull
-cd ~/strautomator/core && npm install && make build
-cd ~/strautomator/web  && npm install
+cd ~/strautomator/core  && npm install && make build
+cd ~/strautomator/web   && npm install
+cd ~/strautomator/admin && npm install   # only if you use the Admin panel
 ```
 
-Then restart the app (`make run`, or `sudo systemctl restart strautomator`). In production, also rerun the build commands from [9.2](#92-build-and-start).
+Then restart the app (`make run`, or `sudo systemctl restart strautomator`). In production, also rerun the build commands from [9.2](#92-build-and-start). For the Admin panel, rerun `npm run build` (production only) and restart it (`make run`, or `sudo systemctl restart strautomator-admin`).
 
-After updating, compare your settings against `settings.secret.json.sample` and `core/settings.json`, because new optional modules may need to be disabled or configured.
+After updating, compare your settings against `settings.secret.json.sample` and `core/settings.json`, because new optional modules may need to be disabled or configured. If you use the Admin panel, copy the updated `web/settings.secret.json` to `admin/` again.

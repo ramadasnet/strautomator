@@ -131,7 +131,3 @@ The [Dockerfile.dockerignore](Dockerfile.dockerignore) keeps secrets, the web an
 The [admin-docker.yml](../.github/workflows/admin-docker.yml) GitHub Actions workflow builds the image for `linux/amd64` and `linux/arm64` and pushes it to `ghcr.io/ramadasnet/strautomator-admin`, tagged with the commit SHA and `latest`. It runs only when files under `admin/` change on `master`. Changes to the core alone do not trigger it, so start it manually (workflow dispatch) if the admin needs a new core.
 
 Please read the files under the repository root `.agents/` for deployment, GIT and coding conventions.
-
-## Code style
-
-Prettier is configured in [package.json](package.json): 4 spaces, no semicolons, double quotes, no bracket spacing, 250 columns.
