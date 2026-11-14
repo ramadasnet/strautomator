@@ -7,9 +7,9 @@
 - Enforce the Prettier rules defined inside the `package.json` or in the `.prettierrc` file.
 - When creating new files that cannot be formatted with Prettier, keep the same style and patterns as the existing source code.
 
-# GIT
+# Git
 
-Reference the file `.agents/AGENTS-git.md` for GIT and source control rules and conventions whenever a GIT operation is needed.
+Reference the file `.agents/AGENTS-git.md` for Git and source control rules and conventions whenever a Git operation is needed.
 
 # Deployments
 
