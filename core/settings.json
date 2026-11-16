@@ -564,7 +564,9 @@
     "ragpulse": {
         "baseUrl": "https://chat.ragpulse.dev/",
         // ID of the RAGPulse project where chat messages are sent to.
-        "projectId": null
+        "projectId": null,
+        // Max characters buffered while waiting for an incomplete stream frame to be completed.
+        "maxFrameSize": 65536
     },
     "recipes": {
         // Backlink text (will have the app title appended to it).

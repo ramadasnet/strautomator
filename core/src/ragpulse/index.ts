@@ -112,11 +112,16 @@ export class Ragpulse {
                 }
             }
 
+            // Limit how much data is buffered while waiting for a frame to be completed.
+            const maxFrameSize: number = settings.ragpulse.maxFrameSize > 0 ? settings.ragpulse.maxFrameSize : 65536
+            const frameTooLarge = () => new Error(`Incomplete chat frame exceeded the ${maxFrameSize} characters limit`)
+
             // Process complete "event + data" blocks from the stream buffer.
             const consume = (chunk: any): void => {
                 pending += decoder.decode(chunk, {stream: true})
                 let index = pending.indexOf("\n\n")
                 while (index >= 0) {
+                    if (index > maxFrameSize) throw frameTooLarge()
                     const block = pending.slice(0, index)
                     pending = pending.slice(index + 2)
                     let eventName = "message"
@@ -133,31 +138,34 @@ export class Ragpulse {
                     }
                     index = pending.indexOf("\n\n")
                 }
+                if (pending.length > maxFrameSize) throw frameTooLarge()
             }
 
-            // If a response object was passed, stream the answer back to the client as it arrives.
-            if (res) {
-                result.data.on("data", consume)
-                result.data.on("error", (ex) => {
-                    logger.error("Ragpulse.getAnswer", logUser, message, ex)
-                    res.end()
-                })
-                result.data.on("end", () => {
-                    if (!answer && fallback) {
-                        res.write(fallback)
+            // Consume the stream to the end. If a response object was passed, the answer is written back
+            // to the client as it arrives, but the promise stays pending until the stream is done, so stream
+            // failures (even before the first delta) are propagated to the caller.
+            await new Promise<void>((resolve, reject) => {
+                const stream = result.data
+                stream.on("data", (chunk: any) => {
+                    try {
+                        consume(chunk)
+                    } catch (ex) {
+                        stream.destroy()
+                        reject(ex)
                     }
-                    res.end()
-                    logger.info("Ragpulse.getAnswer", logUser, message, answer || fallback || "no answer", "Streamed")
                 })
+                stream.on("error", reject)
+                stream.on("end", () => resolve())
+            })
+
+            if (res) {
+                if (!answer && fallback) {
+                    res.write(fallback)
+                }
+                res.end()
+                logger.info("Ragpulse.getAnswer", logUser, message, answer || fallback || "no answer", "Streamed")
                 return
             }
-
-            // Otherwise consume the stream to the end and return the full answer.
-            await new Promise<void>((resolve, reject) => {
-                result.data.on("data", consume)
-                result.data.on("error", reject)
-                result.data.on("end", () => resolve())
-            })
 
             const finalAnswer = answer || fallback || null
             logger.info("Ragpulse.getAnswer", logUser, message, finalAnswer || "No answer")
