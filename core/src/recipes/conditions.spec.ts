@@ -39,7 +39,7 @@ for (const {props, hitKey} of booleanProps) {
     for (const prop of props) {
         const missKeys = ["no PR / KOM", "no segments", hitKey == "PR" ? "KOM" : "PR"]
 
-        for (const yes of [true, "true"]) {
+        for (const yes of [true, "true", 1]) {
             check(prop, RecipeOperator.Equal, yes, hitKey, true)
             check(prop, RecipeOperator.NotEqual, yes, hitKey, false)
             for (const key of missKeys) {
@@ -48,7 +48,7 @@ for (const {props, hitKey} of booleanProps) {
             }
         }
 
-        for (const no of [false, "false"]) {
+        for (const no of [false, "false", 0]) {
             check(prop, RecipeOperator.Equal, no, hitKey, false)
             check(prop, RecipeOperator.NotEqual, no, hitKey, true)
             for (const key of missKeys) {
