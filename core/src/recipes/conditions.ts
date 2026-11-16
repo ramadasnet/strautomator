@@ -296,30 +296,45 @@ export const checkGear = (activity: StravaActivity, condition: RecipeCondition):
 }
 
 /**
- * Check if the passed activity includes the specified segment at least once.
+ * Check if the passed activity includes the specified segment at least once,
+ * or if it has (or not) new segment PRs / KOMs.
  * @param activity The Strava activity to be checked.
  * @param condition The segment-based recipe condition.
  */
 export const checkSegments = (activity: StravaActivity, condition: RecipeCondition): boolean => {
     const op = condition.operator
     const cProp = condition.property
-    const cValue = condition.value.toString()
+    const isKom = cProp == "segments.kom" || cProp == "komSegments"
+    const isPr = cProp == "segments.pr" || cProp == "prSegments"
+    const segments = activity.segments ? Object.values(activity.segments) : []
     let found = false
+
+    // PR / KOM conditions are boolean, so compare the result against the condition value.
+    if (isKom || isPr) {
+        found = segments.some((s) => (isKom ? s.kom : s.pr))
+        const expected = condition.value === true || condition.value === "true"
+
+        if (op == RecipeOperator.Equal && found == expected) {
+            return true
+        }
+        if (op == RecipeOperator.NotEqual && found != expected) {
+            return true
+        }
+
+        logger.debug("Recipes.checkSegments", logHelper.activity(activity), condition, "Failed")
+        return false
+    }
 
     if (!activity.segments) {
         return op == RecipeOperator.NotEqual
     }
 
-    if (cProp == "segments.kom" || cProp == "komSegments") {
-        found = Object.values(activity.segments).find((s) => s.kom) ? true : false
-    } else if (cProp == "segments.pr" || cProp == "prSegments") {
-        found = Object.values(activity.segments).find((s) => s.pr) ? true : false
-    } else if (cProp == "segments") {
-        found = activity.segments[cValue] ? true : false
-    } else {
+    if (cProp != "segments") {
         logger.debug("Recipes.checkSegments", logHelper.activity(activity), condition, "Failed")
         return false
     }
+
+    found = activity.segments[condition.value.toString()] ? true : false
 
     if (op == RecipeOperator.Equal) {
         return found ? true : false
