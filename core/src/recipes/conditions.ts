@@ -312,7 +312,7 @@ export const checkSegments = (activity: StravaActivity, condition: RecipeConditi
     // PR / KOM conditions are boolean, so compare the result against the condition value.
     if (isKom || isPr) {
         found = segments.some((s) => (isKom ? s.kom : s.pr))
-        const expected = condition.value === true || condition.value === "true"
+        const expected = condition.value === true || condition.value === "true" || condition.value === 1
 
         if (op == RecipeOperator.Equal && found == expected) {
             return true
