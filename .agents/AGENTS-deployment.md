@@ -6,7 +6,7 @@
 ## Versioning
 
 - Packages should have their version updated with each PR or deployment. If the version was not changed compared to the latest of the master branch, confirm with the user if you should auto-update before starting a new deployment.
-- Do NOT generate a new GIT tag when updating the version, unless the new version is meant to be deployed to production! For example the `npm version` command should be called with the `--no-git-tag-version` parameter by default.
+- Do NOT generate a new Git tag when updating the version, unless the new version is meant to be deployed to production! For example the `npm version` command should be called with the `--no-git-tag-version` parameter by default.
 - Only 2 types of versioning patterns should be supported, and you should check the current version to decide which is the right one:
 
 ### Semantic Versioning 2.0.0

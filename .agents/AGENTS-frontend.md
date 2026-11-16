@@ -12,3 +12,7 @@
 ## Localization
 
 - If the app implements different languages and locales, make sure to update those as well!
+
+## Writing Style
+
+- Keep the use of em dashes on phrases and comments to a minimum!

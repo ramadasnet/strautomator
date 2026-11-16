@@ -1,4 +1,4 @@
-# GIT Conventions
+# Git Conventions
 
 - Group commits by logical change or relevance. Avoid committing too many unrelated changes at once. Prefer smaller commits with clear change boundaries.
 - Do NOT prefix branch names (fix, feat, etc). The branch names should be self descriptive and short, all lowercase.
