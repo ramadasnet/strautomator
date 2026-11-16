@@ -1,6 +1,6 @@
 VERSION:= $(shell date '+%y.%-V%u.1%H%M')
 
-# Clean GIT tags.
+# Clean Git tags.
 clean-tags:
 	git tag | xargs git tag -d
 	git fetch -t

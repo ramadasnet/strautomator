@@ -11,8 +11,8 @@ Strautomator is using the [SetMeUp](https://github.com/igoramadas/setmeup) modul
 - **settings.json** - settings shared by all environments, targeting production by default
 - **settings.development.json** - development settings, mostly when running on your dev machine
 - **settings.production.json** - production-only settings, except credentials and secrets (optional)
-- **settings.secret.json** - private credentials and secrets, excluded from the GIT repo
-- **settings.local.json** - private local-only settings, excluded from the GIT repo
+- **settings.secret.json** - private credentials and secrets, excluded from the Git repo
+- **settings.local.json** - private local-only settings, excluded from the Git repo
 
 Please note that the [Core](../core) also has its own collection of settings files as well. If the same setting is define on the Core and on the Web, the Web settings has the higher priority.
 

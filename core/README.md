@@ -64,7 +64,7 @@ Strautomator is using the [SetMeUp](https://github.com/igoramadas/setmeup) modul
 - **settings.json** - settings shared by all environments, targeting production by default
 - **settings.development.json** - development settings, mostly when running on your dev machine
 - **settings.production.json** - production-only settings, except credentials and secrets (optional)
-- **settings.secret.json** - private credentials and secrets, excluded from the GIT repo
+- **settings.secret.json** - private credentials and secrets, excluded from the Git repo
 - **GCS settings** - optional, will be downloaded from a Google Cloud Storage bucket on startup
 
 Additionally, you can also define settings via environment variables, prefixed by SMU and separating levels with underscore. So for instance to define the `app.title` via an environment variable, you should set the value on `$SMU_app_title`. To define `gcp.projectId`, use `$SMU_gcp_projectId`. And so on.
