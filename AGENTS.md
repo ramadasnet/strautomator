@@ -1,6 +1,8 @@
 # Base instructions
 
-- For a brief overview of what this project is, how it works and how it should be updated in general, read the file `README.md` first.
+- For a brief overview of what this project is, how it works and how it should be updated in general, read the file `README-agents.md` first.
+- Avoid editing files via `python -c`/heredoc. Prefer using the edit tool.
+- Prefer grep / find_file_by_name / read tools over `grep|find|cat|sed` in exec.
 
 # Code Style
 
@@ -31,6 +33,6 @@ Reference the file `.agents/AGENTS-nuxt.md` if the app is using Nuxt and code ch
 
 Reference the file `.agents/AGENTS-frontend.md` for frontend, UI, UX and CSS conventions if UX or UI changes are involved.
 
-## Security
+# Security
 
-- If you are conducting a security scan of the repository, you can find our security conventions described under `.agents/AGENTS-security.md`.
+If you are conducting a security scan of the repository, you can find our security conventions described under `.agents/AGENTS-security.md`.
