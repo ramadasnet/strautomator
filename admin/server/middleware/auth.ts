@@ -74,7 +74,7 @@ export default defineEventHandler(async (e) => {
             throw createError({statusCode: 401, message: "Invalid token"})
         }
 
-        // Allowed admin emails, supports override via NUXT_ADMIN_EMAILS (comma-separated).
+        // Allowed admin emails, supports override via NUXT_PUBLIC_AUTH_EMAILS (comma-separated).
         const authEmails = (Array.isArray(config.public.authEmails) ? config.public.authEmails : String(config.public.authEmails).split(",")).map((e) => e.trim()).filter(Boolean)
         if (!authEmails.includes(email)) {
             throw createError({statusCode: 403, message: "Email not authorized"})

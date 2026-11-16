@@ -9,7 +9,7 @@ export const useAuthStore = defineStore("auth", {
     }),
     actions: {
         async authenticateUser(response: CredentialResponse) {
-            // Allowed admin emails, supports override via NUXT_ADMIN_EMAILS (comma-separated).
+            // Allowed admin emails, supports override via NUXT_PUBLIC_AUTH_EMAILS (comma-separated).
             const rawEmails = useRuntimeConfig().public.authEmails as string[] | string
             const authEmails = (Array.isArray(rawEmails) ? rawEmails : String(rawEmails).split(",")).map((e) => e.trim()).filter(Boolean)
             const user = decodeCredential(response.credential)
