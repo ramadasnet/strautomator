@@ -1,13 +1,13 @@
 // Strautomator API: Help chat
 
-import {chatbase} from "strautomator-core"
+import {ragpulse} from "strautomator-core"
 import {defineEventHandler} from "nuxt/server"
 import {requestValidator} from "../../utils/auth"
-import {createStreamWriter, getBody, renderError} from "../../utils/web"
+import {createStreamWriter, getBody, getClientIP, renderError} from "../../utils/web"
 import logger from "anyhow"
 
 /**
- * Ask the Chatbase AI bot.
+ * Ask the RAGPulse AI bot.
  */
 export default defineEventHandler(async (event) => {
     try {
@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
                 return result
             }
 
-            chatbase.getAnswer(user as any, body.message.trim(), writer as any).then(
+            ragpulse.getAnswer(user as any, body.message.trim(), writer as any, getClientIP(event)).then(
                 () => {
                     if (!settled) {
                         settled = true
