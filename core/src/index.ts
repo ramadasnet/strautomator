@@ -81,8 +81,8 @@ import {Gemini} from "./gemini"
 export const gemini: Gemini = Gemini.Instance
 import {OpenRouter} from "./openrouter"
 export const openrouter: OpenRouter = OpenRouter.Instance
-import {Chatbase} from "./chatbase"
-export const chatbase: Chatbase = Chatbase.Instance
+import {Ragpulse} from "./ragpulse"
+export const ragpulse: Ragpulse = Ragpulse.Instance
 import {FitParser} from "./fitparser"
 export const fitparser: FitParser = FitParser.Instance
 import {Garmin} from "./garmin"
@@ -251,7 +251,7 @@ export const startup = async (quickStart?: boolean) => {
     await Promise.all(coreModules.map(initModule))
     const secondaryModules = [ai, announcements, calendar, faq, gearwear, gdpr, mailer, maps, notifications, openrouter, recipes, weather]
     await Promise.allSettled(secondaryModules.map(initModule))
-    const optionalModules = [chatbase, garmin, gemini, komoot, lastfm, music, spotify, wahoo]
+    const optionalModules = [ragpulse, garmin, gemini, komoot, lastfm, music, spotify, wahoo]
     await Promise.allSettled(optionalModules.map(initModule))
 
     process.env.SMU_APP_STARTED = "1"

@@ -29,13 +29,13 @@ Required integrations:
 
 Additional integrations:
 
-- Chatbase API
 - Garmin Connect API
 - GitHub API
 - Last.fm API
 - LocationIQ API
 - Paddle API
 - PayPal API
+- RAGPulse API
 - Spotify API
 - Wahoo Cloud API
 - AI providers: OpenRouter, Gemini
