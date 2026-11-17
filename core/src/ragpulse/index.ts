@@ -118,7 +118,8 @@ export class Ragpulse {
 
             // Process complete "event + data" blocks from the stream buffer.
             const consume = (chunk: any): void => {
-                pending += decoder.decode(chunk, {stream: true})
+                // Normalise CRLF on the whole buffer so a CR at a chunk boundary still pairs with its LF.
+                pending = (pending + decoder.decode(chunk, {stream: true})).replace(/\r\n/g, "\n")
                 let index = pending.indexOf("\n\n")
                 while (index >= 0) {
                     if (index > maxFrameSize) throw frameTooLarge()
