@@ -188,7 +188,8 @@ const initRagpulse = () => {
 const setRagpulseVisibility = (visibility: "visible" | "hidden") => {
     const widget = document.querySelector("[data-ragpulse]") as HTMLElement
     if (widget) {
-        widget.style.visibility = visibility
+        // display instead of visibility: the widget's shadow DOM resets inherited properties.
+        widget.style.display = visibility == "hidden" ? "none" : ""
     }
 }
 
