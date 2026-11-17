@@ -169,11 +169,11 @@ const initRagpulse = () => {
     const win = window as any
     if (win.RAGPulse) {
         setRagpulseVisibility("visible")
-    } else if (store.ragpulse?.projectId) {
+    } else if (store.ragpulseProjectId) {
         const onLoad = () => {
             const script = document.createElement("script")
-            script.src = `${store.ragpulse.baseUrl}embed.js`
-            script.setAttribute("data-project", store.ragpulse.projectId)
+            script.src = "https://chat.ragpulse.dev/embed.js"
+            script.setAttribute("data-project", store.ragpulseProjectId)
             script.async = true
             document.body.appendChild(script)
         }

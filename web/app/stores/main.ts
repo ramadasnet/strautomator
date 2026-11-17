@@ -33,7 +33,7 @@ export interface MainState {
     archiveDownloadDays: number
     aiHumours: string[]
     paddle: {environment: string; token: string; priceId: {yearly: string; lifetime: string}}
-    ragpulse: {projectId: string; baseUrl: string}
+    ragpulseProjectId: string
 }
 
 /**
@@ -80,7 +80,7 @@ export const useMainStore = defineStore("main", {
         archiveDownloadDays: null,
         aiHumours: [],
         paddle: null,
-        ragpulse: null
+        ragpulseProjectId: null
     }),
     getters: {
         isLoggedIn: (state): boolean => !!(state.oauth?.accessToken && state.user),

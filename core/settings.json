@@ -560,13 +560,10 @@
             }
         }
     },
-    // RAGPulse chat support integration, self-hosted at https://chat.ragpulse.dev
+    // RAGPulse chat support, hosted at https://chat.ragpulse.dev
     "ragpulse": {
-        "baseUrl": "https://chat.ragpulse.dev/",
-        // ID of the RAGPulse project where chat messages are sent to.
-        "projectId": null,
-        // Max characters buffered while waiting for an incomplete stream frame to be completed.
-        "maxFrameSize": 65536
+        // ID of the RAGPulse project embedded on the Help and FAQ pages.
+        "projectId": null
     },
     "recipes": {
         // Backlink text (will have the app title appended to it).

@@ -34,5 +34,5 @@ useHead({title: "Help"})
 
 const store = useMainStore()
 const loggedIn = computed(() => !!(store.oauth && store.user))
-const chatUrl = computed(() => (store.ragpulse?.projectId ? `${store.ragpulse.baseUrl}chat/${store.ragpulse.projectId}` : ""))
+const chatUrl = computed(() => (store.ragpulseProjectId ? `https://chat.ragpulse.dev/chat/${store.ragpulseProjectId}` : ""))
 </script>
