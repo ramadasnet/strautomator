@@ -134,13 +134,6 @@
         // Calendar events will cached if they're older than 30 days, by default.
         "minAgeForCachingDays": 30
     },
-    "chatbase": {
-        "api": {
-            "baseUrl": "https://www.chatbase.co/api/v1/"
-        },
-        // Chatbase will use the cheapest Gemini 2.0 by default.
-        "model": "gemini-2.0-flash"
-    },
     "cookie": {
         "sessionName": "strautsession",
         // This secret should be updated via the settings.secret.json file or
@@ -566,6 +559,11 @@
                 "weather": 99
             }
         }
+    },
+    // RAGPulse chat support, hosted at https://chat.ragpulse.dev
+    "ragpulse": {
+        // ID of the RAGPulse project embedded on the Help and FAQ pages.
+        "projectId": null
     },
     "recipes": {
         // Backlink text (will have the app title appended to it).

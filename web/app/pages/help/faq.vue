@@ -163,31 +163,18 @@ const debounceSearch = _.debounce(async () => {
 }, 600)
 
 /**
- * Show Chatbase's floating help widget on the FAQ page.
+ * Show RAGPulse's floating help widget on the FAQ page.
  */
-const initChatbase = () => {
+const initRagpulse = () => {
     const win = window as any
-    if (!win.chatbase || win.chatbase("getState") !== "initialized") {
-        win.chatbase = (...args: any[]) => {
-            if (!win.chatbase.q) {
-                win.chatbase.q = []
-            }
-            win.chatbase.q.push(args)
-        }
-        win.chatbase = new Proxy(win.chatbase, {
-            get(target, prop) {
-                if (prop === "q") {
-                    return target.q
-                }
-                return (...args: any[]) => target(prop, ...args)
-            }
-        })
-
+    if (win.RAGPulse) {
+        setRagpulseVisibility("visible")
+    } else if (store.ragpulseProjectId) {
         const onLoad = () => {
             const script = document.createElement("script")
-            script.src = "https://www.chatbase.co/embed.min.js"
-            script.id = "neTz5lyyofpBTh8BNF1kf"
-            script.setAttribute("domain", "www.chatbase.co")
+            script.src = "https://chat.ragpulse.dev/embed.js"
+            script.setAttribute("data-project", store.ragpulseProjectId)
+            script.async = true
             document.body.appendChild(script)
         }
         if (document.readyState === "complete") {
@@ -195,24 +182,21 @@ const initChatbase = () => {
         } else {
             window.addEventListener("load", onLoad)
         }
-    } else {
-        setChatbaseVisibility("visible")
     }
 }
 
-const setChatbaseVisibility = (visibility: "visible" | "hidden") => {
-    for (const id of ["chatbase-bubble-window", "chatbase-bubble-button", "chatbase-message-bubbles"]) {
-        const element = document.getElementById(id)
-        if (element) {
-            element.style.visibility = visibility
-        }
+const setRagpulseVisibility = (visibility: "visible" | "hidden") => {
+    const widget = document.querySelector("[data-ragpulse]") as HTMLElement
+    if (widget) {
+        // display instead of visibility: the widget's shadow DOM resets inherited properties.
+        widget.style.display = visibility == "hidden" ? "none" : ""
     }
 }
 
 onMounted(() => {
     loadFaq()
-    initChatbase()
+    initRagpulse()
 })
 
-onBeforeUnmount(() => setChatbaseVisibility("hidden"))
+onBeforeUnmount(() => setRagpulseVisibility("hidden"))
 </script>

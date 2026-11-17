@@ -7,7 +7,11 @@
                 <h1 v-else>Help</h1>
 
                 <div :class="{'site-card pa-0 overflow-hidden': !loggedIn}">
-                    <iframe frameborder="0" src="https://www.chatbase.co/neTz5lyyofpBTh8BNF1kf/help" style="display: block; width: 100%; min-height: 650px"></iframe>
+                    <iframe v-if="chatUrl" frameborder="0" :src="chatUrl" allow="clipboard-write" title="Chat" style="display: block; width: 100%; min-height: 650px"></iframe>
+                    <div class="pa-6" v-else>
+                        The chat is not available at the moment. Please check the <nuxt-link to="/help/faq" title="Frequently asked questions">FAQ</nuxt-link> or drop an email to
+                        <a href="mailto:info@strautomator.com" title="Email support">info@strautomator.com</a>.
+                    </div>
                 </div>
 
                 <feature-links />
@@ -29,54 +33,6 @@ definePageMeta({
 useHead({title: "Help"})
 
 const store = useMainStore()
-const route = useRoute()
-const webError = useWebError()
-
-const loading = ref(false)
-const streaming = ref(false)
-const message = ref("")
-const answer = ref<string>(null)
 const loggedIn = computed(() => !!(store.oauth && store.user))
-
-/**
- * Get the chat answer for the current message.
- */
-const getAnswer = async () => {
-    try {
-        loading.value = true
-
-        const body = JSON.stringify({message: message.value}, null, 0)
-        const response = await fetch("/api/help/chat", {body, method: "POST", headers: {"Content-Type": "application/json"}})
-        const reader = response.body.getReader()
-        const decoder = new TextDecoder()
-
-        answer.value = ""
-
-        streaming.value = true
-        while (streaming.value) {
-            const {done, value} = await reader.read()
-            if (done) {
-                streaming.value = false
-            } else {
-                answer.value += decoder.decode(value)
-            }
-        }
-    } catch (ex) {
-        webError("Help.getAnswer", ex)
-    } finally {
-        loading.value = false
-        streaming.value = false
-    }
-}
-
-onMounted(() => {
-    try {
-        if (route.query?.q) {
-            message.value = decodeURIComponent(route.query.q.toString())
-            getAnswer()
-        }
-    } catch (ex) {
-        webError("Help.fetch", ex)
-    }
-})
+const chatUrl = computed(() => (store.ragpulseProjectId ? `https://chat.ragpulse.dev/chat/${store.ragpulseProjectId}` : ""))
 </script>

@@ -350,7 +350,6 @@ Then replace its contents with the **minimal working configuration** below. It e
   "garmin": {"disabled": true},
   "mailer": {"disabled": true},
   "openrouter": {"disabled": true},
-  "chatbase": {"disabled": true},
   "weather": {
     "weatherapi": {"disabled": true},
     "tomorrow": {"disabled": true},

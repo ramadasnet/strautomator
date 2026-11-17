@@ -71,7 +71,8 @@ const getStaticState = () => {
                 yearly: paddle.prices.yearlyPrice.id,
                 lifetime: paddle.prices.lifetimePrice.id
             }
-        }
+        },
+        ragpulseProjectId: settings.ragpulse.projectId
     }
 
     return staticState
