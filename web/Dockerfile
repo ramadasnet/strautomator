@@ -2,7 +2,10 @@
 # docker build -f web/Dockerfile .
 
 # BUILDER
-FROM node:26-alpine AS strautomator-web-builder
+# Runs on the native build platform only, as the output is platform independent and the
+# client bundling hangs or crashes under QEMU emulation. The legacy builder (used by Cloud Build)
+# does not set BUILDPLATFORM, so it falls back to linux/amd64 there.
+FROM --platform=${BUILDPLATFORM:-linux/amd64} node:26-alpine AS strautomator-web-builder
 WORKDIR /app
 COPY core/ ./core/
 COPY web/ ./web/
