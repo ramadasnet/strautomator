@@ -68,20 +68,36 @@ export const refreshTokens = async () => {
 }
 
 /**
- * Make sure webhook is registered on Strava.
+ * Make sure webhook is registered on Strava, pointing to the expected callback URL.
  */
 export const setupWebhook = async () => {
     logger.info("F.Strava.setupWebhook.start")
+    let cancelled = false
 
     try {
         const current = await core.strava.webhooks.getWebhook()
+        const expectedUrl = core.strava.webhooks.callbackUrl
 
-        if (!current) {
-            await core.strava.webhooks.createWebhook()
-            logger.info("F.Strava.setupWebhook", `ID ${core.strava.webhooks.current.id}`)
+        if (current?.callbackUrl == expectedUrl) {
+            return
         }
+
+        if (current) {
+            logger.error("F.Strava.setupWebhook", "CRITICAL: webhook points to the wrong callback URL, will cancel and recreate it", `Registered: ${current.callbackUrl}`, `Expected: ${expectedUrl}`)
+
+            try {
+                await core.strava.webhooks.cancelWebhook()
+                cancelled = true
+            } catch (cancelEx) {
+                logger.error("F.Strava.setupWebhook", "Could not cancel the current webhook, will try to recreate it anyways", cancelEx)
+            }
+        }
+
+        await core.strava.webhooks.createWebhook()
+        logger.info("F.Strava.setupWebhook", `ID ${core.strava.webhooks.current.id}`, expectedUrl)
     } catch (ex) {
-        logger.error("F.Strava.setupWebhook", ex)
+        const state = cancelled ? "no webhook is registered on Strava now" : "could not verify or repair the Strava webhook"
+        logger.error("F.Strava.setupWebhook", `CRITICAL: ${state}`, ex)
     }
 }
 
