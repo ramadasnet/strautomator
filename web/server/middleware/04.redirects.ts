@@ -22,7 +22,7 @@ export default defineEventHandler((event) => {
         return sendRedirect(event, cookie?.includes(`${settings.cookie.sessionName}=`) ? "/dashboard" : "/home", 302)
     }
 
-    const redirect = settings.app.redirects?.find((r) => r.from === url)
+    const redirect = settings.app.redirects?.find((r) => r.from === url || r.from === path)
     if (redirect) {
         return sendRedirect(event, redirect.to, 301)
     }
