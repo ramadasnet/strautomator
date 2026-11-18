@@ -109,8 +109,6 @@ import {Announcements} from "./announcements"
 export const announcements: Announcements = Announcements.Instance
 import {Calendar} from "./calendar"
 export const calendar: Calendar = Calendar.Instance
-import {FAQ} from "./faq"
-export const faq: FAQ = FAQ.Instance
 import {GDPR} from "./gdpr"
 export const gdpr: GDPR = GDPR.Instance
 import {EventManager} from "./eventmanager"
@@ -247,7 +245,7 @@ export const startup = async (quickStart?: boolean) => {
     // Init individual modules now. Start with the most important modules, than the rest.
     const coreModules = [github, paypal, paddle, strava, users, subscriptions]
     await Promise.all(coreModules.map(initModule))
-    const secondaryModules = [ai, announcements, calendar, faq, gearwear, gdpr, mailer, maps, notifications, openrouter, recipes, weather]
+    const secondaryModules = [ai, announcements, calendar, gearwear, gdpr, mailer, maps, notifications, openrouter, recipes, weather]
     await Promise.allSettled(secondaryModules.map(initModule))
     const optionalModules = [garmin, gemini, komoot, lastfm, music, spotify, wahoo]
     await Promise.allSettled(optionalModules.map(initModule))

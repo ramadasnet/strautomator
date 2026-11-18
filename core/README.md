@@ -84,7 +84,6 @@ The following collections are used:
 - **announcements** website announcements
 - **athlete-records** athlete sports records
 - **calendars** exported Strava calendars
-- **faq** help questions and answers
 - **garmin** cached Garmin data
 - **gearwear** GearWear configurations
 - **komoot** cached Komoot routes
