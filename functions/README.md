@@ -10,8 +10,8 @@ The [index.js](index.js) exports one entry point per schedule:
 
 | Entry point          | Pub/Sub topic         | Schedule (Europe/Berlin) | Main tasks                                                                              |
 | -------------------- | --------------------- | ------------------------ | --------------------------------------------------------------------------------------- |
-| `hourlyTasks`        | `hourly-tasks`        | Every hour               | Regenerate calendars, check the Strava API status.                                      |
-| `dailyTasks`         | `daily-tasks`         | Daily at 22:00           | GearWear processing, Strava webhook and cache cleanup, recipe counters, Spotify expiry. |
+| `hourlyTasks`        | `hourly-tasks`        | Every hour               | Strava webhook registration, regenerate calendars, check the Strava API status.         |
+| `dailyTasks`         | `daily-tasks`         | Daily at 22:00           | GearWear processing, Strava cache cleanup, recipe counters, Spotify expiry.             |
 | `weeklyTasks`        | `weekly-tasks`        | Wednesdays at 20:00      | Athlete performance processing, non-active subscriptions, usage counters.               |
 | `monthlyTasks`       | `monthly-tasks`       | On the 15th at 06:00     | Email reminders, idle GearWear, archived stats, Paddle / GitHub / PayPal subscriptions. |
 | `weekendMaintenance` | `weekend-maintenance` | Sundays at 10:00         | Old activities and idle users cleanup, fitness levels, Spotify / Garmin / Wahoo tokens. |
