@@ -517,7 +517,7 @@ docker run -d --name strautomator -p 8080:8080 \
     strautomator-web
 ```
 
-The app URL comes from `app.url` in `settings.secret.json` (or pass it as `-e SMU_app_url=...`). The image must be built from the repository root, as it compiles and bundles the local `core/` folder. The Makefile's `docker-build` target builds for `linux/arm64`. Use plain `docker build` to build for your own architecture.
+The app URL comes from `app.url` in `settings.secret.json` (or pass it as `-e SMU_app_url=...`). The image must be built from the repository root, as it compiles and bundles the local `core/` folder. Instead of building it yourself, you can also use the prebuilt `ghcr.io/ramadasnet/strautomator-web:latest` image (`linux/amd64` and `linux/arm64`), published from every change to `master`. The Makefile's `docker-build` target builds for `linux/arm64`. Use plain `docker build` to build for your own architecture.
 
 ### Scheduled jobs
 
