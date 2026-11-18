@@ -2,7 +2,7 @@
     "name": "strautomator-admin",
     "private": true,
     "type": "module",
-    "version": "26.472.12131",
+    "version": "26.473.11551",
     "scripts": {
         "build": "nuxt build",
         "dev": "VITE_CJS_TRACE=true nuxt dev",

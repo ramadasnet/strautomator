@@ -2,7 +2,9 @@
 # docker build -f admin/Dockerfile .
 
 # BUILDER
-FROM node:26-alpine AS strautomator-admin-builder
+# Runs on the native build platform only, as the output is platform independent and the
+# client bundling hangs or crashes under QEMU emulation.
+FROM --platform=$BUILDPLATFORM node:26-alpine AS strautomator-admin-builder
 WORKDIR /app
 COPY core/ ./core/
 COPY admin/ ./admin/
