@@ -45,6 +45,10 @@
             {
                 "from": "/calendar/upcoming",
                 "to": "/map"
+            },
+            {
+                "from": "/help/faq",
+                "to": "/help"
             }
         ]
     },
@@ -160,10 +164,6 @@
         "pageSize": 500,
         // Disable writing to the database? Useful while troubleshooting data from production.
         "writeDisabled": false
-    },
-    "faq": {
-        // Download questions from the database four times a day by default. Value set in milliseconds.
-        "refreshSeconds": 21600
     },
     "fitparser": {
         // Maximum number of FIT files processed / fetched at once.
@@ -562,7 +562,7 @@
     },
     // RAGPulse chat support, hosted at https://chat.ragpulse.dev
     "ragpulse": {
-        // ID of the RAGPulse project embedded on the Help and FAQ pages.
+        // ID of the RAGPulse project embedded on the Help page.
         "projectId": null
     },
     "recipes": {
