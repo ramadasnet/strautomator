@@ -9,6 +9,7 @@ Automations for Strava activities (recipes, GearWear mileage, FTP updates, calen
 - `web/` `strautomator-web` — Nuxt + Vue 3 + Vuetify: site, API, Strava webhooks, MCP server (`server/mcp/`); deploys to Cloud Run via `cloudbuild.yaml`
 - `functions/` `strautomator-functions` — scheduled tasks `hourlyTasks|dailyTasks|weeklyTasks|monthlyTasks|weekendMaintenance` in `index.js`, Cloud Functions 1st gen triggered by Cloud Scheduler → Pub/Sub
 - `admin/` — separate Nuxt SPA admin panel, Docker image built by `.github/workflows/admin-docker.yml` (outside Cloud Build; Cloud Build ignores `admin/`)
+- GHCR images: `.github/workflows/admin-docker.yml` and `web-docker.yml` push `ghcr.io/ramadasnet/strautomator-{admin,web}` (amd64 + arm64) on `master`; the Dockerfile builder stages run on the native build platform only, as Nuxt bundling hangs or crashes under QEMU
 - Firestore is always the database — a GCP project is required even for local dev; GCS holds calendars, GDPR exports and the prod settings bucket
 - `deployment/` is gitignored local ops material (startup script, certs)
 

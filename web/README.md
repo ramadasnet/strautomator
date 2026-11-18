@@ -85,6 +85,7 @@ Basic deployment samples are provided:
 - App Engine: [app.yaml](app.yaml.sample) (not tested in production).
 - VM or VPS: see the systemd and Docker instructions on [SETUP.md](../SETUP.md).
 - Cloud Run: the [cloudbuild.yaml](../cloudbuild.yaml) on the repository root builds the Docker image and deploys it, together with the scheduled functions, whenever a new version tag is pushed.
+- Docker: the [web-docker.yml](../.github/workflows/web-docker.yml) GitHub Actions workflow builds the image for `linux/amd64` and `linux/arm64` and pushes it to `ghcr.io/ramadasnet/strautomator-web`, tagged with the commit SHA and `latest`, whenever the web or core change on `master`.
 
 ### Scheduled functions
 

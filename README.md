@@ -7,7 +7,7 @@ This is a monorepo with 4 main modules:
 | Module                        | What it is                                                                 | Runs on                          |
 | ----------------------------- | -------------------------------------------------------------------------- | -------------------------------- |
 | [core](core#readme)           | Business logic, database, storage and 3rd party integrations (TypeScript). | Bundled into the web/functions.  |
-| [web](web#readme)             | Website, API, webhooks and MCP server (Nuxt, Vue 3, Vuetify).              | Google Cloud Run                 |
+| [web](web#readme)             | Website, API, webhooks and MCP server (Nuxt, Vue 3, Vuetify).              | Google Cloud Run, Docker (GHCR)  |
 | [functions](functions#readme) | Scheduled maintenance tasks (subscriptions, GearWear, cleanup, counters).  | Google Cloud Functions (1st gen) |
 | [admin](admin#readme)         | Internal admin panel (Nuxt SPA, Vuetify) for users, subscriptions, gear.   | Docker image (GHCR)              |
 
@@ -97,5 +97,7 @@ make deploy
 This sets the new date-based version on the web and functions, commits it, creates a `vYY.WWD.1HHMM` tag and pushes it to GitHub.
 
 The [admin](admin#readme) is not part of the Cloud Build pipeline. It has a dedicated GitHub Actions workflow ([admin-docker.yml](.github/workflows/admin-docker.yml)) that builds and pushes its Docker image only when files under `admin/` change on `master` (or when started manually). Likewise, the Cloud Build triggers ignore changes under `admin/`.
+
+The web Docker image is also published to `ghcr.io/ramadasnet/strautomator-web` by the [web-docker.yml](.github/workflows/web-docker.yml) workflow, whenever files under `web/` or `core/` change on `master` (or when started manually). This is independent of Cloud Build, which keeps building and deploying its own image from version tags.
 
 Secrets are never part of this repository. The web and functions download the encrypted `settings.secret.json` from a GCS bucket at startup. The `strautomator-deploy` trigger sets the `_DEPLOY=true` and `_SETTINGS_BUCKET` substitutions, and the GCP project ID comes from Cloud Build itself, so these values are not stored in the repository.
