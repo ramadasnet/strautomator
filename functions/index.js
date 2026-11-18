@@ -44,10 +44,11 @@ exports.hourlyTasks = async () => {
     await startupCheck(["calendar", "komoot", "mailer", "maps", "strava", "subscriptions", "users", "weather"])
 
     try {
+        await strava.setupWebhook()
         await calendar.regenerate()
         await strava.apiCheckStatus()
     } catch (ex) {
-        logger.warn("Functions.dailyTasks", ex.message || ex.toString())
+        logger.warn("Functions.hourlyTasks", ex.message || ex.toString())
     }
     return
 }
@@ -58,7 +59,6 @@ exports.dailyTasks = async () => {
 
     try {
         await gearwear.processRecentActivities()
-        await strava.setupWebhook()
         await strava.cleanupQueuedActivities()
         await strava.cleanupCache()
         await strava.apiCheckStatus()
