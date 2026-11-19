@@ -440,35 +440,7 @@ export class StravaActivities {
             if (settings.strava.testMode) {
                 logger.warn("Strava.setActivity", "TEST MODE (do not write to Strava)", activity.id, logResult.join(" | "))
             } else {
-                try {
-                    await api.put(user.stravaTokens, `activities/${activity.id}`, null, data)
-                } catch (ex) {
-                    // Strava only documents more restrictive visibility changes, so a rejected
-                    // visibility must not discard the remaining updates of the recipe.
-                    if (_.isNil(data.visibility) || (ex.response?.status || ex.status) != 400) {
-                        throw ex
-                    }
-
-                    const rejectedVisibility = data.visibility
-                    logger.warn("Strava.setActivity", `${activity.id}, from user ${user.id}`, `Update rejected, retrying without the visibility ${rejectedVisibility}`, ex.message || ex.toString())
-                    delete data.visibility
-                    delete activity.visibility
-                    activity.updatedFields = activity.updatedFields.filter((f) => f != "visibility")
-
-                    const visibilityLog = logResult.findIndex((line) => line.indexOf("visibility = ") == 0)
-                    if (visibilityLog >= 0) logResult.splice(visibilityLog, 1)
-
-                    await api.put(user.stravaTokens, `activities/${activity.id}`, null, data)
-
-                    // The remaining fields were updated, but the visibility was not. A rejected
-                    // restriction leaves the activity more visible than asked for, so it fails;
-                    // a rejected widening leaves it more private, which only warrants a warning.
-                    if (!activity.visibilityWiden) {
-                        throw new Error(`Strava rejected the visibility ${rejectedVisibility}, other fields were updated: ${ex.message || ex.toString()}`)
-                    }
-
-                    logger.warn("Strava.setActivity", `${activity.id}, from user ${user.id}`, `Strava rejected widening the visibility to ${rejectedVisibility}, kept it unchanged`)
-                }
+                await api.put(user.stravaTokens, `activities/${activity.id}`, null, data)
                 logger.info("Strava.setActivity", `${activity.id}, from user ${user.id}`, logResult.join(" | "))
             }
         } catch (ex) {

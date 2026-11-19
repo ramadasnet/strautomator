@@ -5,7 +5,7 @@ import {RecipeAction, RecipeActionType, RecipeCondition, RecipeData, RecipeOpera
 import {generateId} from "./utils"
 import * as actions from "./actions"
 import * as conditions from "./conditions"
-import {StravaActivity, StravaVisibility} from "../strava/types"
+import {StravaActivity} from "../strava/types"
 import {UserData} from "../users/types"
 import {getTimeoutSignal} from "../timeout"
 import database from "../database"
@@ -208,11 +208,6 @@ export class Recipes {
                     if (!isUrl) {
                         throw new Error(`Webhook URL is not valid`)
                     }
-                }
-
-                // Visibility must be one of the known settings.
-                if (action.type == RecipeActionType.Visibility && !Object.values(StravaVisibility).includes(action.value as StravaVisibility)) {
-                    throw new Error(`Visibility must be everyone, followers_only or only_me`)
                 }
 
                 // Action too long?

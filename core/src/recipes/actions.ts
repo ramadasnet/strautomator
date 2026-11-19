@@ -717,18 +717,8 @@ export const workoutTypeAction = async (user: UserData, activity: StravaActivity
 }
 
 /**
- * Visibility ranks, as Strava only accepts moves towards a more restrictive setting.
- */
-const visibilityRanks: Record<string, number> = {
-    [StravaVisibility.Everyone]: 0,
-    [StravaVisibility.FollowersOnly]: 1,
-    [StravaVisibility.OnlyMe]: 2
-}
-
-/**
- * Set the activity visibility. Strava documents only more restrictive changes, so a
- * widening request is sent as a best effort: a rejection or an ignored value is logged
- * but does not fail the recipe, while a rejected restriction does.
+ * Set the activity visibility. Strava only handles more restrictive changes, so a rejected
+ * value fails the activity update through the usual error handling.
  * @param user The activity owner.
  * @param activity The Strava activity details.
  * @param recipe The source recipe.
@@ -736,21 +726,12 @@ const visibilityRanks: Record<string, number> = {
  */
 export const visibilityAction = async (user: UserData, activity: StravaActivity, recipe: RecipeData, action: RecipeAction): Promise<boolean> => {
     try {
-        const target = action.value as StravaVisibility
-        const targetRank = visibilityRanks[target]
-        const currentRank = visibilityRanks[activity.visibility]
-
-        if (_.isNil(targetRank)) {
-            throw new Error(`Invalid visibility: ${action.value}`)
-        }
-
-        if (currentRank == targetRank) {
+        if (activity.visibility == action.value) {
             logger.info("Recipes.visibilityAction", logHelper.user(user), logHelper.activity(activity), logHelper.recipe(recipe), `Visibility is already ${activity.visibility}`)
             return true
         }
 
-        activity.visibilityWiden = !_.isNil(currentRank) && targetRank < currentRank
-        activity.visibility = target
+        activity.visibility = action.value as StravaVisibility
         activity.updatedFields.push("visibility")
 
         return true
