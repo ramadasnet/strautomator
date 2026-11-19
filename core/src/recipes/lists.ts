@@ -165,6 +165,7 @@ export const recipeActionList = [
     {value: "appendDescription", text: "Append to activity description"},
     {value: "sportType", text: "Change sport type"},
     {value: "workoutType", text: "Set workout type"},
+    {value: "visibility", text: "Change activity visibility"},
     {value: "privateNote", text: "Set private notes"},
     {value: "prependPrivateNote", text: "Prepend to private notes"},
     {value: "appendPrivateNote", text: "Append to private notes"},

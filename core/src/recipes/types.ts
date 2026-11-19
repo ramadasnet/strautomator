@@ -155,6 +155,7 @@ export enum RecipeActionType {
     HideStatStartTime = "hideStatStartTime",
     SportType = "sportType",
     WorkoutType = "workoutType",
+    Visibility = "visibility",
     PrivateNote = "privateNote",
     PrependPrivateNote = "prependPrivateNote",
     AppendPrivateNote = "appendPrivateNote",

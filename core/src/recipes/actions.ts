@@ -5,7 +5,7 @@ import {recipeActionList} from "./lists"
 import {AiProviderName} from "../ai/types"
 import {GearWearComponent, GearWearConfig} from "../gearwear/types"
 import {transformActivityFields} from "../strava/utils"
-import {StravaActivity, StravaActivityToProcess, StravaGear, StravaSport} from "../strava/types"
+import {StravaActivity, StravaActivityToProcess, StravaGear, StravaSport, StravaVisibility} from "../strava/types"
 import {UserData} from "../users/types"
 import {ActivityWeather} from "../weather/types"
 import {AxiosConfig, axiosRequest} from "../axios"
@@ -708,6 +708,31 @@ export const workoutTypeAction = async (user: UserData, activity: StravaActivity
             activity.workoutType = action.value
             activity.updatedFields.push("workoutType")
         }
+
+        return true
+    } catch (ex) {
+        failedAction(user, activity, recipe, action, ex)
+        return false
+    }
+}
+
+/**
+ * Set the activity visibility. Strava only handles more restrictive changes, so a rejected
+ * value fails the activity update through the usual error handling.
+ * @param user The activity owner.
+ * @param activity The Strava activity details.
+ * @param recipe The source recipe.
+ * @param action The action details.
+ */
+export const visibilityAction = async (user: UserData, activity: StravaActivity, recipe: RecipeData, action: RecipeAction): Promise<boolean> => {
+    try {
+        if (activity.visibility == action.value) {
+            logger.info("Recipes.visibilityAction", logHelper.user(user), logHelper.activity(activity), logHelper.recipe(recipe), `Visibility is already ${activity.visibility}`)
+            return true
+        }
+
+        activity.visibility = action.value as StravaVisibility
+        activity.updatedFields.push("visibility")
 
         return true
     } catch (ex) {

@@ -508,6 +508,11 @@ export class Recipes {
             return actions.workoutTypeAction(user, activity, recipe, action)
         }
 
+        // Change activity visibility?
+        else if (action.type == RecipeActionType.Visibility) {
+            return actions.visibilityAction(user, activity, recipe, action)
+        }
+
         // Change activity map style?
         else if (action.type == RecipeActionType.MapStyle) {
             return actions.mapStyleAction(user, activity, recipe, action)

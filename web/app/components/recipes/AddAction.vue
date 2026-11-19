@@ -36,6 +36,10 @@
                                 <div v-else-if="selectedAction?.value == 'mapStyle'">
                                     <v-select label="Select a map style" v-model="selectedMapStyle" item-value="value" item-title="title" :items="mapStyles" density="compact" variant="outlined" rounded return-object></v-select>
                                 </div>
+                                <div v-else-if="selectedAction?.value == 'visibility'">
+                                    <v-select label="Select a visibility" v-model="selectedVisibility" item-value="value" item-title="title" :items="visibilities" :rules="[recipeRules.required]" density="compact" variant="outlined" rounded return-object></v-select>
+                                    <div class="mt-n1 text-caption text-center">Strava documents only more restrictive changes, so it may ignore Everyone.</div>
+                                </div>
                                 <div v-else-if="actionIsAI">
                                     <v-checkbox
                                         v-if="!insightsCustomPrompt && selectedAction?.value == 'generateInsights'"
@@ -186,6 +190,7 @@ const selectedGearComponent = ref<SelectItem | null>(null)
 const selectedSportType = ref<SelectItem | null>(null)
 const selectedWorkoutType = ref<SelectItem | null>(null)
 const selectedMapStyle = ref<SelectItem | null>(null)
+const selectedVisibility = ref<SelectItem | null>(null)
 const selectedAiHumour = ref<SelectItem | null>(null)
 const insightsCustomPrompt = ref(false)
 const webhookMethod = ref("POST")
@@ -196,6 +201,11 @@ const gearComponents = ref<SelectItem[]>([])
 const sportTypes = ref<SelectItem[]>([])
 const workoutTypes = ref<SelectItem[]>([])
 const mapStyles = ref<SelectItem[]>([])
+const visibilities: SelectItem[] = [
+    {value: "everyone", title: "Everyone"},
+    {value: "followers_only", title: "Followers only"},
+    {value: "only_me", title: "Only me"}
+]
 const aiHumours = ref<SelectItem[]>([])
 const showTags = ref(false)
 const valueInput = ref("")
@@ -296,6 +306,7 @@ const resetData = () => {
     selectedSportType.value = null
     selectedWorkoutType.value = null
     selectedMapStyle.value = null
+    selectedVisibility.value = null
     selectedAiHumour.value = humours[0]
     insightsCustomPrompt.value = false
     webhookMethod.value = "POST"
@@ -380,6 +391,9 @@ const save = async () => {
     } else if (result.type == "mapStyle") {
         result.value = selectedMapStyle.value?.value
         result.friendlyValue = selectedMapStyle.value?.text || selectedMapStyle.value?.title
+    } else if (result.type == "visibility") {
+        result.value = selectedVisibility.value?.value
+        result.friendlyValue = selectedVisibility.value?.title
     } else if (result.type == "webhook") {
         const webhookValue = `${webhookMethod.value} ${webhookUrl.value}`
         result.value = webhookValue
