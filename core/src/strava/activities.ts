@@ -449,7 +449,8 @@ export class StravaActivities {
                         throw ex
                     }
 
-                    logger.warn("Strava.setActivity", `${activity.id}, from user ${user.id}`, `Visibility ${data.visibility} was rejected, will retry without it`, ex.message || ex.toString())
+                    const rejectedVisibility = data.visibility
+                    logger.warn("Strava.setActivity", `${activity.id}, from user ${user.id}`, `Visibility ${rejectedVisibility} was rejected, retrying without it`, ex.message || ex.toString())
                     delete data.visibility
                     delete activity.visibility
                     activity.updatedFields = activity.updatedFields.filter((f) => f != "visibility")
@@ -458,6 +459,10 @@ export class StravaActivities {
                     if (visibilityLog >= 0) logResult.splice(visibilityLog, 1)
 
                     await api.put(user.stravaTokens, `activities/${activity.id}`, null, data)
+
+                    // The remaining fields were updated, but the visibility was not, so the user
+                    // must be warned rather than left to believe their activity is now private.
+                    throw new Error(`Strava rejected the visibility ${rejectedVisibility}, other fields were updated: ${ex.message || ex.toString()}`)
                 }
                 logger.info("Strava.setActivity", `${activity.id}, from user ${user.id}`, logResult.join(" | "))
             }
