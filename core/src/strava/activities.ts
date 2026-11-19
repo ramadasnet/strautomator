@@ -13,26 +13,6 @@ import dayjs from "../dayjs"
 const settings = require("setmeup").settings
 
 /**
- * Warn when Strava accepted a visibility write but kept the previous value, which it does
- * with values it does not handle instead of failing the request.
- * @param user The activity owner.
- * @param activity The activity that was updated.
- * @param data The fields that were sent to Strava.
- * @param response The Strava API response.
- */
-const applyVisibilityResult = (user: UserData, activity: StravaActivity, data: any, response: any): void => {
-    const applied = response?.data?.visibility
-
-    if (!activity.visibilityWiden || !applied || applied == data.visibility) {
-        return
-    }
-
-    logger.warn("Strava.setActivity", `${activity.id}, from user ${user.id}`, `Strava ignored the visibility ${data.visibility}, activity kept as ${applied}`)
-    delete activity.visibility
-    activity.updatedFields = activity.updatedFields.filter((f) => f != "visibility")
-}
-
-/**
  * Strava activities manager.
  */
 export class StravaActivities {
@@ -461,8 +441,7 @@ export class StravaActivities {
                 logger.warn("Strava.setActivity", "TEST MODE (do not write to Strava)", activity.id, logResult.join(" | "))
             } else {
                 try {
-                    const response = await api.put(user.stravaTokens, `activities/${activity.id}`, null, data)
-                    applyVisibilityResult(user, activity, data, response)
+                    await api.put(user.stravaTokens, `activities/${activity.id}`, null, data)
                 } catch (ex) {
                     // Strava only documents more restrictive visibility changes, so a rejected
                     // visibility must not discard the remaining updates of the recipe.
