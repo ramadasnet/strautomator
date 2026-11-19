@@ -38,7 +38,7 @@
                                 </div>
                                 <div v-else-if="selectedAction?.value == 'visibility'">
                                     <v-select label="Select a visibility" v-model="selectedVisibility" item-value="value" item-title="title" :items="visibilities" :rules="[recipeRules.required]" density="compact" variant="outlined" rounded return-object></v-select>
-                                    <div class="mt-n1 text-caption text-center">Strava only allows changing the visibility to a more restrictive setting.</div>
+                                    <div class="mt-n1 text-caption text-center">Strava documents only more restrictive changes, so it may ignore Everyone.</div>
                                 </div>
                                 <div v-else-if="actionIsAI">
                                     <v-checkbox
@@ -202,6 +202,7 @@ const sportTypes = ref<SelectItem[]>([])
 const workoutTypes = ref<SelectItem[]>([])
 const mapStyles = ref<SelectItem[]>([])
 const visibilities: SelectItem[] = [
+    {value: "everyone", title: "Everyone"},
     {value: "followers_only", title: "Followers only"},
     {value: "only_me", title: "Only me"}
 ]

@@ -726,8 +726,9 @@ const visibilityRanks: Record<string, number> = {
 }
 
 /**
- * Set the activity visibility. Strava only accepts a more restrictive setting,
- * so the action is skipped when the activity is already at or above the target.
+ * Set the activity visibility. Strava documents only more restrictive changes, so a
+ * widening request is sent as a best effort: a rejection or an ignored value is logged
+ * but does not fail the recipe, while a rejected restriction does.
  * @param user The activity owner.
  * @param activity The Strava activity details.
  * @param recipe The source recipe.
@@ -735,19 +736,21 @@ const visibilityRanks: Record<string, number> = {
  */
 export const visibilityAction = async (user: UserData, activity: StravaActivity, recipe: RecipeData, action: RecipeAction): Promise<boolean> => {
     try {
-        if (action.value != StravaVisibility.FollowersOnly && action.value != StravaVisibility.OnlyMe) {
-            throw new Error(`Visibility can only be set to followers_only or only_me`)
-        }
-
-        const targetRank = visibilityRanks[action.value]
+        const target = action.value as StravaVisibility
+        const targetRank = visibilityRanks[target]
         const currentRank = visibilityRanks[activity.visibility]
 
-        if (!_.isNil(currentRank) && currentRank >= targetRank) {
-            logger.info("Recipes.visibilityAction", logHelper.user(user), logHelper.activity(activity), logHelper.recipe(recipe), `Visibility is already ${activity.visibility}, won't set it to ${action.value}`)
+        if (_.isNil(targetRank)) {
+            throw new Error(`Invalid visibility: ${action.value}`)
+        }
+
+        if (currentRank == targetRank) {
+            logger.info("Recipes.visibilityAction", logHelper.user(user), logHelper.activity(activity), logHelper.recipe(recipe), `Visibility is already ${activity.visibility}`)
             return true
         }
 
-        activity.visibility = action.value as StravaVisibility
+        activity.visibilityWiden = !_.isNil(currentRank) && targetRank < currentRank
+        activity.visibility = target
         activity.updatedFields.push("visibility")
 
         return true

@@ -44,6 +44,8 @@ export interface StravaActivity {
     private?: boolean
     /** Activity visibility (everyone, followers_only or only_me). */
     visibility?: StravaVisibility
+    /** Is the pending visibility change a widening one, which Strava does not document? */
+    visibilityWiden?: boolean
     /** Marked as commute? */
     commute?: boolean
     /** Tagged as a workout? */

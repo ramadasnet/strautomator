@@ -13,6 +13,26 @@ import dayjs from "../dayjs"
 const settings = require("setmeup").settings
 
 /**
+ * Warn when Strava accepted a visibility write but kept the previous value, which it does
+ * with values it does not handle instead of failing the request.
+ * @param user The activity owner.
+ * @param activity The activity that was updated.
+ * @param data The fields that were sent to Strava.
+ * @param response The Strava API response.
+ */
+const applyVisibilityResult = (user: UserData, activity: StravaActivity, data: any, response: any): void => {
+    const applied = response?.data?.visibility
+
+    if (!activity.visibilityWiden || !applied || applied == data.visibility) {
+        return
+    }
+
+    logger.warn("Strava.setActivity", `${activity.id}, from user ${user.id}`, `Strava ignored the visibility ${data.visibility}, activity kept as ${applied}`)
+    delete activity.visibility
+    activity.updatedFields = activity.updatedFields.filter((f) => f != "visibility")
+}
+
+/**
  * Strava activities manager.
  */
 export class StravaActivities {
@@ -441,10 +461,11 @@ export class StravaActivities {
                 logger.warn("Strava.setActivity", "TEST MODE (do not write to Strava)", activity.id, logResult.join(" | "))
             } else {
                 try {
-                    await api.put(user.stravaTokens, `activities/${activity.id}`, null, data)
+                    const response = await api.put(user.stravaTokens, `activities/${activity.id}`, null, data)
+                    applyVisibilityResult(user, activity, data, response)
                 } catch (ex) {
-                    // Strava only accepts a more restrictive visibility, so a rejected visibility
-                    // must not discard the remaining updates of the recipe.
+                    // Strava only documents more restrictive visibility changes, so a rejected
+                    // visibility must not discard the remaining updates of the recipe.
                     if (_.isNil(data.visibility) || (ex.response?.status || ex.status) != 400) {
                         throw ex
                     }
@@ -460,9 +481,14 @@ export class StravaActivities {
 
                     await api.put(user.stravaTokens, `activities/${activity.id}`, null, data)
 
-                    // The remaining fields were updated, but the visibility was not, so the user
-                    // must be warned rather than left to believe their activity is now private.
-                    throw new Error(`Strava rejected the visibility ${rejectedVisibility}, other fields were updated: ${ex.message || ex.toString()}`)
+                    // The remaining fields were updated, but the visibility was not. A rejected
+                    // restriction leaves the activity more visible than asked for, so it fails;
+                    // a rejected widening leaves it more private, which only warrants a warning.
+                    if (!activity.visibilityWiden) {
+                        throw new Error(`Strava rejected the visibility ${rejectedVisibility}, other fields were updated: ${ex.message || ex.toString()}`)
+                    }
+
+                    logger.warn("Strava.setActivity", `${activity.id}, from user ${user.id}`, `Strava rejected widening the visibility to ${rejectedVisibility}, kept it unchanged`)
                 }
                 logger.info("Strava.setActivity", `${activity.id}, from user ${user.id}`, logResult.join(" | "))
             }

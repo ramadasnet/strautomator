@@ -210,9 +210,9 @@ export class Recipes {
                     }
                 }
 
-                // Visibility can only be set to a more restrictive setting.
-                if (action.type == RecipeActionType.Visibility && ![StravaVisibility.FollowersOnly, StravaVisibility.OnlyMe].includes(action.value as StravaVisibility)) {
-                    throw new Error(`Visibility must be either followers_only or only_me`)
+                // Visibility must be one of the known settings.
+                if (action.type == RecipeActionType.Visibility && !Object.values(StravaVisibility).includes(action.value as StravaVisibility)) {
+                    throw new Error(`Visibility must be everyone, followers_only or only_me`)
                 }
 
                 // Action too long?
