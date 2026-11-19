@@ -1,6 +1,6 @@
 // Strautomator Core: Strava Utils
 
-import {StravaActivity, StravaActivityPerformance, StravaActivityToProcess, StravaClub, StravaClubEvent, StravaGear, StravaLap, StravaProfile, StravaProfileStats, StravaRideType, StravaRoute, StravaRunType, StravaSport, StravaTotals} from "./types"
+import {StravaActivity, StravaActivityPerformance, StravaActivityToProcess, StravaClub, StravaClubEvent, StravaGear, StravaLap, StravaProfile, StravaProfileStats, StravaRideType, StravaRoute, StravaRunType, StravaSport, StravaTotals, StravaVisibility} from "./types"
 import {UserData} from "../users/types"
 import {recipePropertyList} from "../recipes/lists"
 import {translation} from "../translations"
@@ -134,6 +134,7 @@ export function toStravaActivity(user: UserData, data: any): StravaActivity {
         name: data.name,
         flagged: data.flagged ? true : false,
         private: data.private ? true : false,
+        visibility: data.visibility as StravaVisibility,
         commute: data.commute ? true : false,
         hideHome: data.hide_from_home ? true : false,
         trainer: data.trainer ? true : false,

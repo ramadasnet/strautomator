@@ -42,6 +42,8 @@ export interface StravaActivity {
     privateNote?: string
     /** Is the activity private? */
     private?: boolean
+    /** Activity visibility (everyone, followers_only or only_me). */
+    visibility?: StravaVisibility
     /** Marked as commute? */
     commute?: boolean
     /** Tagged as a workout? */
@@ -798,6 +800,15 @@ export enum StravaMapStyle {
     Time = "time",
     Heatmap = "heatmap",
     StravaMetro = "metro"
+}
+
+/**
+ * Strava activity visibility settings, from the least to the most restrictive.
+ */
+export enum StravaVisibility {
+    Everyone = "everyone",
+    FollowersOnly = "followers_only",
+    OnlyMe = "only_me"
 }
 
 /**

@@ -5,7 +5,7 @@ import {RecipeAction, RecipeActionType, RecipeCondition, RecipeData, RecipeOpera
 import {generateId} from "./utils"
 import * as actions from "./actions"
 import * as conditions from "./conditions"
-import {StravaActivity} from "../strava/types"
+import {StravaActivity, StravaVisibility} from "../strava/types"
 import {UserData} from "../users/types"
 import {getTimeoutSignal} from "../timeout"
 import database from "../database"
@@ -208,6 +208,11 @@ export class Recipes {
                     if (!isUrl) {
                         throw new Error(`Webhook URL is not valid`)
                     }
+                }
+
+                // Visibility can only be set to a more restrictive setting.
+                if (action.type == RecipeActionType.Visibility && ![StravaVisibility.FollowersOnly, StravaVisibility.OnlyMe].includes(action.value as StravaVisibility)) {
+                    throw new Error(`Visibility must be either followers_only or only_me`)
                 }
 
                 // Action too long?
@@ -506,6 +511,11 @@ export class Recipes {
         // Change activity workout type?
         else if (action.type == RecipeActionType.WorkoutType) {
             return actions.workoutTypeAction(user, activity, recipe, action)
+        }
+
+        // Change activity visibility?
+        else if (action.type == RecipeActionType.Visibility) {
+            return actions.visibilityAction(user, activity, recipe, action)
         }
 
         // Change activity map style?

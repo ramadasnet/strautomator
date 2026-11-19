@@ -5,7 +5,7 @@ import {recipeActionList} from "./lists"
 import {AiProviderName} from "../ai/types"
 import {GearWearComponent, GearWearConfig} from "../gearwear/types"
 import {transformActivityFields} from "../strava/utils"
-import {StravaActivity, StravaActivityToProcess, StravaGear, StravaSport} from "../strava/types"
+import {StravaActivity, StravaActivityToProcess, StravaGear, StravaSport, StravaVisibility} from "../strava/types"
 import {UserData} from "../users/types"
 import {ActivityWeather} from "../weather/types"
 import {AxiosConfig, axiosRequest} from "../axios"
@@ -708,6 +708,47 @@ export const workoutTypeAction = async (user: UserData, activity: StravaActivity
             activity.workoutType = action.value
             activity.updatedFields.push("workoutType")
         }
+
+        return true
+    } catch (ex) {
+        failedAction(user, activity, recipe, action, ex)
+        return false
+    }
+}
+
+/**
+ * Visibility ranks, as Strava only accepts moves towards a more restrictive setting.
+ */
+const visibilityRanks: Record<string, number> = {
+    [StravaVisibility.Everyone]: 0,
+    [StravaVisibility.FollowersOnly]: 1,
+    [StravaVisibility.OnlyMe]: 2
+}
+
+/**
+ * Set the activity visibility. Strava only accepts a more restrictive setting,
+ * so the action is skipped when the activity is already at or below the target.
+ * @param user The activity owner.
+ * @param activity The Strava activity details.
+ * @param recipe The source recipe.
+ * @param action The action details.
+ */
+export const visibilityAction = async (user: UserData, activity: StravaActivity, recipe: RecipeData, action: RecipeAction): Promise<boolean> => {
+    try {
+        if (action.value != StravaVisibility.FollowersOnly && action.value != StravaVisibility.OnlyMe) {
+            throw new Error(`Visibility can only be set to followers_only or only_me`)
+        }
+
+        const targetRank = visibilityRanks[action.value]
+        const currentRank = visibilityRanks[activity.visibility]
+
+        if (!_.isNil(currentRank) && currentRank >= targetRank) {
+            logger.info("Recipes.visibilityAction", logHelper.user(user), logHelper.activity(activity), logHelper.recipe(recipe), `Visibility is already ${activity.visibility}, won't set it to ${action.value}`)
+            return true
+        }
+
+        activity.visibility = action.value as StravaVisibility
+        activity.updatedFields.push("visibility")
 
         return true
     } catch (ex) {
