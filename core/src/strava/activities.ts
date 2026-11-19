@@ -450,7 +450,7 @@ export class StravaActivities {
                     }
 
                     const rejectedVisibility = data.visibility
-                    logger.warn("Strava.setActivity", `${activity.id}, from user ${user.id}`, `Visibility ${rejectedVisibility} was rejected, retrying without it`, ex.message || ex.toString())
+                    logger.warn("Strava.setActivity", `${activity.id}, from user ${user.id}`, `Update rejected, retrying without the visibility ${rejectedVisibility}`, ex.message || ex.toString())
                     delete data.visibility
                     delete activity.visibility
                     activity.updatedFields = activity.updatedFields.filter((f) => f != "visibility")

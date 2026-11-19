@@ -727,7 +727,7 @@ const visibilityRanks: Record<string, number> = {
 
 /**
  * Set the activity visibility. Strava only accepts a more restrictive setting,
- * so the action is skipped when the activity is already at or below the target.
+ * so the action is skipped when the activity is already at or above the target.
  * @param user The activity owner.
  * @param activity The Strava activity details.
  * @param recipe The source recipe.
