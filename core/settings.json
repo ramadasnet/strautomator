@@ -634,6 +634,8 @@
         "cname": true
     },
     "strava": {
+        // Set to true to disable the creation of the Strava webhook subscription.
+        "webhookDisabled": false,
         // API endpoints and credentials from Strava. The "clientId" and "clientSecret" must be set via secret
         // settings or via the SMU_strava_api_clientId and SMU_strava_api_clientSecret environment variables.
         "api": {

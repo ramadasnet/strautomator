@@ -77,6 +77,11 @@ export class StravaWebhooks {
      */
     createWebhook = async (): Promise<void> => {
         try {
+            if (settings.strava.webhookDisabled == true) {
+                logger.warn("Strava.createWebhook", "Strava webhook creation is disabled in settings")
+                return
+            }
+
             const query = {
                 callback_url: this.callbackUrl,
                 client_id: settings.strava.api.clientId,
