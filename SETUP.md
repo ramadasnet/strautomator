@@ -411,10 +411,10 @@ The app decrypts the file automatically at startup. If you don't set `SMU_CRYPTO
 
 ```sh
 cd ~/strautomator/web
-make run
+make dev
 ```
 
-`make run` does the following:
+`make dev` does the following:
 
 1. Copies `../core/lib` and `../core/settings*.json` into `node_modules/strautomator-core`, so your local core changes are used.
 2. Starts the Nuxt dev server (`npm run dev`) on **port 3000**, with the scheduled jobs running in the same process. Both the frontend (`app/`) and the Nitro server (`server/`) reload automatically when you change their sources.
@@ -521,7 +521,7 @@ The app URL comes from `app.url` in `settings.secret.json` (or pass it as `-e SM
 
 ### Scheduled jobs
 
-Development mode runs several jobs inside the app: delayed activity processing (about every 2 minutes), calendar regeneration (about every 3 minutes), plus GearWear and cache cleanup once at startup. They only run when the `STRAUTOMATOR_CRON` environment variable is set, which the `npm` scripts behind `make run` do for you. **Production mode runs none of them.** The official site runs them as Cloud Functions from the [functions](../functions) folder. On a VPS you have two options:
+Development mode runs several jobs inside the app: delayed activity processing (about every 2 minutes), calendar regeneration (about every 3 minutes), plus GearWear and cache cleanup once at startup. They only run when the `STRAUTOMATOR_CRON` environment variable is set, which the `npm` scripts behind `make dev` do for you. **Production mode runs none of them.** The official site runs them as Cloud Functions from the [functions](../functions) folder. On a VPS you have two options:
 
 - Deploy the functions on your own infrastructure. Or,
 - at minimum, process delayed activities on a schedule with a cron entry. The request must go through your public Cloudflare URL, so it gets past `requireCloudflare`:
@@ -593,13 +593,13 @@ The web dev server already uses port 3000, so run the admin on another port, for
 
 ```sh
 cd ~/strautomator/admin
-PORT=3001 make run
+PORT=3001 make dev
 ```
 
-Like the web, `make run` copies `../core/lib` and `../core/settings*.json` into `node_modules/strautomator-core` before it starts the Nuxt dev server. Open http://localhost:3001, click **Sign in with Google**, and choose an allowed account.
+Like the web, `make dev` copies `../core/lib` and `../core/settings*.json` into `node_modules/strautomator-core` before it starts the Nuxt dev server. Open http://localhost:3001, click **Sign in with Google**, and choose an allowed account.
 
-- The dev server always runs with `NODE_ENV=development`, so the admin uses the `-dev` collections, the same data as a web instance running with `make run`. To manage a production instance, run a production build of the admin (see below).
-- On macOS, if the dev server fails with `Vite Node IPC socket path not configured`, run it with `TMPDIR=/tmp PORT=3001 make run`.
+- The dev server always runs with `NODE_ENV=development`, so the admin uses the `-dev` collections, the same data as a web instance running with `make dev`. To manage a production instance, run a production build of the admin (see below).
+- On macOS, if the dev server fails with `Vite Node IPC socket path not configured`, run it with `TMPDIR=/tmp PORT=3001 make dev`.
 
 ### 10.4 Run it on a VPS (production mode)
 
@@ -735,8 +735,8 @@ To see more detail on any problem, set `"app": {"debug": true}` in `settings.loc
 | `Failed to authenticate user` after choosing a Google account                        | The email isn't in `NUXT_PUBLIC_AUTH_EMAILS`, or it's still the dummy default            | Set `NUXT_PUBLIC_AUTH_EMAILS` and restart the admin.                                                                                                                                                            |
 | Sent back to the login page; logs show `Failed to verify token`                      | Wrong or missing `NUXT_PUBLIC_GOOGLE_SIGN_IN_CLIENT_ID`, or the ID token expired         | Check the client ID and sign in again.                                                                                                                                                                          |
 | Startup fails with `Missing the mandatory gcp.projectId setting` or `paddle.api.key` | No `admin/settings.secret.json`, or it lacks the module flags                            | Copy the web file ([10.2](#102-settings-and-environment-variables)).                                                                                                                                            |
-| The admin starts but shows no users                                                  | It uses another database or environment than the web (`-dev` collections vs. production) | Use the same `gcp.projectId`, and run both in the same mode. `make run` always uses development.                                                                                                                |
-| `EADDRINUSE :::3000` or the admin opens on another port                              | The web dev server already uses port 3000                                                | Start it with `PORT=3001 make run`.                                                                                                                                                                             |
+| The admin starts but shows no users                                                  | It uses another database or environment than the web (`-dev` collections vs. production) | Use the same `gcp.projectId`, and run both in the same mode. `make dev` always uses development.                                                                                                                |
+| `EADDRINUSE :::3000` or the admin opens on another port                              | The web dev server already uses port 3000                                                | Start it with `PORT=3001 make dev`.                                                                                                                                                                             |
 
 ## 12. Updating
 
@@ -747,6 +747,6 @@ cd ~/strautomator/web   && npm install
 cd ~/strautomator/admin && npm install   # only if you use the Admin panel
 ```
 
-Then restart the app (`make run`, or `sudo systemctl restart strautomator`). In production, also rerun the build commands from [9.2](#92-build-and-start). For the Admin panel, rerun `npm run build` (production only) and restart it (`make run`, or `sudo systemctl restart strautomator-admin`).
+Then restart the app (`make dev`, or `sudo systemctl restart strautomator`). In production, also rerun the build commands from [9.2](#92-build-and-start). For the Admin panel, rerun `npm run build` (production only) and restart it (`make dev`, or `sudo systemctl restart strautomator-admin`).
 
 After updating, compare your settings against `settings.secret.json.sample` and `core/settings.json`, because new optional modules may need to be disabled or configured. If you use the Admin panel, copy the updated `web/settings.secret.json` to `admin/` again.

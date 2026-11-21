@@ -21,7 +21,7 @@ update:
 	-npm audit fix
 
 # Run the app locally (dev server with hot reload)
-run:
+dev:
 	-cp -r ../core/settings*.json ./node_modules/strautomator-core/
 	-cp -r ../core/lib/. ./node_modules/strautomator-core/lib/
 	npm run dev
