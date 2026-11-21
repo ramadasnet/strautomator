@@ -70,7 +70,7 @@ Please note that the actual port can be overwritten via the PORT environment var
 
 As simple as:
 
-    $ make run
+    $ make dev
 
 If any required settings are missing or wrongly set, you'll get alerted on the console. When running locally (NODE_ENV is development), all features dependent on scheduled functions will run at startup.
 

@@ -36,7 +36,7 @@ Then run the desired entry point. **Always set `NODE_ENV=development`**, otherwi
 NODE_ENV=development node -e "require('./index.js').hourlyTasks().then(() => process.exit(0))"
 ```
 
-If you changed the core, run `make run` once, as it copies the freshly compiled `../core/lib` and settings into `node_modules/strautomator-core`.
+If you changed the core, run `make dev` once, as it copies the freshly compiled `../core/lib` and settings into `node_modules/strautomator-core`.
 
 ## Deploying to production
 
