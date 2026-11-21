@@ -72,7 +72,7 @@ All settings can be overridden at runtime with environment variables, and are pi
 docker run -e NUXT_ADMIN_ALLOWED_IPS="192.168.0.1" -e NUXT_PUBLIC_AUTH_EMAILS="admin@google.com" -p 3000:3000 strautomator-admin
 ```
 
-Variables can also be set in a `.env` file in the `admin` folder (git and Docker ignored, also used to pass `SMU_*` settings to the Core). It is loaded automatically by `make run`, `npm run dev`, `npm run build` and `npm run preview`. When serving the production build directly, use `make serve`, which passes `--env-file-if-exists=.env` to Node (the [Dockerfile](Dockerfile) uses the same flag, but since `.env` is not copied into the image, pass variables with `docker run -e` or mount the file instead).
+Variables can also be set in a `.env` file in the `admin` folder (git and Docker ignored, also used to pass `SMU_*` settings to the Core). It is loaded automatically by `make dev`, `npm run dev`, `npm run build` and `npm run preview`. When serving the production build directly, use `make serve`, which passes `--env-file-if-exists=.env` to Node (the [Dockerfile](Dockerfile) uses the same flag, but since `.env` is not copied into the image, pass variables with `docker run -e` or mount the file instead).
 
 ### IP restriction
 
@@ -89,7 +89,7 @@ make decrypt
 
 Please check the [Core](../core/README.md) docs for the available settings and how they are loaded.
 
-Which environment's data the Core loads is decided by `NODE_ENV`: SetMeUp loads `settings.$NODE_ENV.json`. Note that `make run` always runs with `NODE_ENV=development` — Nuxt forces it on the dev server, and `.env` cannot override variables already set in the environment — so `NODE_ENV=production` in `.env` only affects `make serve`.
+Which environment's data the Core loads is decided by `NODE_ENV`: SetMeUp loads `settings.$NODE_ENV.json`. Note that `make dev` always runs with `NODE_ENV=development` — Nuxt forces it on the dev server, and `.env` cannot override variables already set in the environment — so `NODE_ENV=production` in `.env` only affects `make serve`.
 
 ## Development
 
@@ -98,10 +98,10 @@ Requirements: Node.js 22+ or Bun. The core must be installed (and compiled) firs
 ```sh
 cd core && npm install
 cd ../admin && npm install
-make run     # copies the latest compiled core and starts the dev server (npm run dev)
+make dev     # copies the latest compiled core and starts the dev server (npm run dev)
 ```
 
-When you change the core, run `make build` on the `core` folder, then `make run` here again.
+When you change the core, run `make build` on the `core` folder, then `make dev` here again.
 
 Other useful commands:
 

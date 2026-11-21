@@ -16,7 +16,7 @@ Automations for Strava activities (recipes, GearWear mileage, FTP updates, calen
 ## Commands
 
 - first setup: `cd core && npm install` — `prepare` compiles `src` → `lib`
-- web dev: `cd web && make run` — copies core `settings*.json` + `lib/` into `node_modules/strautomator-core`, then `nuxt dev` :3000 with `STRAUTOMATOR_CRON=true`
+- web dev: `cd web && make dev` — copies core `settings*.json` + `lib/` into `node_modules/strautomator-core`, then `nuxt dev` :3000 with `STRAUTOMATOR_CRON=true`
 - web test: `cd web && npm test` — tsx specs in `server/mcp/*.spec.ts` (only these tests exist)
 - build module: `make build` inside `core|web|functions` (tsc / nuxt build)
 - functions locally: `cd functions && make build && NODE_ENV=development node -e "require('./index.js').hourlyTasks().then(() => process.exit(0))"`
@@ -25,7 +25,7 @@ Automations for Strava activities (recipes, GearWear mileage, FTP updates, calen
 
 ## Conventions
 
-- After editing `core/src`: `cd core && make build`, then re-run `make run` in web/functions — they get a _copy_ of core (the Makefiles re-copy `lib/` + settings before starting)
+- After editing `core/src`: `cd core && make build`, then re-run `make dev` in web/functions — they get a _copy_ of core (the Makefiles re-copy `lib/` + settings before starting)
 - Settings via SetMeUp: `settings.json` committed, `settings.secret.json` gitignored (template `web/settings.secret.json.sample`); prod pulls the encrypted file from a GCS bucket at startup
 - GCP service-account key expected at `~/gcp-strautomator.json`
 - Versioning is per-deploy `YY.WWD.1HHMM` on web+functions only

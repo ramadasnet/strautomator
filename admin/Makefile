@@ -18,7 +18,7 @@ update:
 	$(TSC)
 
 # Run it! Copies the latest compiled core first.
-run: build
+dev: build
 	-cp -r ../core/settings*.json ./node_modules/strautomator-core/
 	-cp -r ../core/lib/. ./node_modules/strautomator-core/lib/
 	@NODE_TLS_REJECT_UNAUTHORIZED=0 npm run dev

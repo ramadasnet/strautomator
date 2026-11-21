@@ -62,7 +62,7 @@ cp settings.secret.json.sample settings.secret.json
 
 ```sh
 npm install
-make run
+make dev
 ```
 
 **4. (Optional) Run the functions.** The functions only need the same secrets as the web. Always set `NODE_ENV=development` when running them locally, otherwise they will use the production settings and database collections.
@@ -77,7 +77,7 @@ NODE_ENV=development node -e "require('./index.js').hourlyTasks().then(() => pro
 
 Replace `hourlyTasks` with `dailyTasks`, `weeklyTasks`, `monthlyTasks` or `weekendMaintenance` to run the other tasks.
 
-When you change the core, run `make build` on the `core` folder. The `make run` of the web and functions copy the freshly compiled core before starting.
+When you change the core, run `make build` on the `core` folder. The `make dev` of the web and functions copy the freshly compiled core before starting.
 
 ## More documentation
 

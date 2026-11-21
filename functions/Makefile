@@ -21,7 +21,7 @@ update:
 	$(TSC)
 
 # Test the functions locally
-run: build
+dev: build
 	-cp -r ../core/settings*.json ./node_modules/strautomator-core/
 	-cp -r ../core/lib/. ./node_modules/strautomator-core/lib/
 	node index.js

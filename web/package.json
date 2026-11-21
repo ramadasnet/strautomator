@@ -1,6 +1,6 @@
 {
     "name": "strautomator-web",
-    "version": "26.474.11627",
+    "version": "26.476.11813",
     "description": "Strautomator.com website.",
     "author": "Igor Ramadas",
     "license": "AGPL-3.0-only",
@@ -39,10 +39,10 @@
         "setmeup": "^2.0.0",
         "strautomator-core": "file:../core",
         "vanilla-jsoneditor": "^3.13.1",
-        "vue": "^3.5.45",
+        "vue": "^3.5.46",
         "vue-draggable-plus": "^0.6.1",
         "vue-router": "^5.5.1",
-        "vuetify": "^4.3.3",
+        "vuetify": "^4.3.4",
         "vuetify-nuxt-module": "^1.0.0-rc.6"
     },
     "devDependencies": {
