@@ -313,7 +313,7 @@ export const shutdown = async (code) => {
 
         // Remove Strava webhook on development.
         const settings = setmeup.settings
-        if (nodeEnv == "development" && !settings.strava.webhookDisabled) {
+        if (nodeEnv == "development" && settings.strava.webhookDisabled != true) {
             await strava.webhooks.cancelWebhook()
         }
     } catch (ex) {
