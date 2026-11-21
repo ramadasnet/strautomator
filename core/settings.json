@@ -563,7 +563,7 @@
     // RAGPulse chat support, hosted at https://chat.ragpulse.dev
     "ragpulse": {
         // ID of the RAGPulse project embedded on the Help page.
-        "projectId": null
+        "projectId": "A49AntyhQwom8o7s"
     },
     "recipes": {
         // Backlink text (will have the app title appended to it).
