@@ -97,7 +97,7 @@
         <section id="pricing" class="hp-section">
             <v-container>
                 <h2 class="hp-title">Start free. Go PRO when you're hooked.</h2>
-                <p class="hp-subtitle">PRO costs less than an espresso per month.</p>
+                <p class="hp-subtitle">PRO costs less than a lunch per year!</p>
 
                 <v-row class="mt-6" justify="center">
                     <v-col cols="12" sm="6" md="4">
@@ -110,6 +110,7 @@
                                 <li><v-icon size="small" start>mdi-check</v-icon>{{ freePlanDetails.maxGearWear }} GearWear configurations</li>
                                 <li><v-icon size="small" start>mdi-check</v-icon>Single weather provider</li>
                                 <li><v-icon size="small" start>mdi-check</v-icon>Limited AI features</li>
+                                <li><v-icon size="small" start>mdi-check</v-icon>Limited Spotify integration</li>
                                 <li><v-icon size="small" start>mdi-check</v-icon>Calendar export ({{ freePlanDetails.pastCalendarDays }} to {{ freePlanDetails.futureCalendarDays }} days)</li>
                                 <li><v-icon size="small" start>mdi-check</v-icon>Personal records for bike and run</li>
                             </ul>
@@ -125,11 +126,11 @@
                                 <li><v-icon size="small" start color="primary">mdi-check-all</v-icon>Unlimited automations and GearWear</li>
                                 <li><v-icon size="small" start color="primary">mdi-check-all</v-icon>Shared automations</li>
                                 <li><v-icon size="small" start color="primary">mdi-check-all</v-icon>Multiple weather providers</li>
-                                <li><v-icon size="small" start color="primary">mdi-check-all</v-icon>Extended AI features, multiple AI providers</li>
+                                <li><v-icon size="small" start color="primary">mdi-check-all</v-icon>Extended AI features and providers</li>
+                                <li><v-icon size="small" start color="primary">mdi-check-all</v-icon>Spotify lyrics and track list</li>
                                 <li><v-icon size="small" start color="primary">mdi-check-all</v-icon>Extended calendar export</li>
                                 <li><v-icon size="small" start color="primary">mdi-check-all</v-icon>Personal records for all sports</li>
-                                <li><v-icon size="small" start color="primary">mdi-check-all</v-icon>Garmin and Wahoo sensors and battery tracking</li>
-                                <li><v-icon size="small" start color="primary">mdi-check-all</v-icon>Spotify lyrics and track list</li>
+                                <li><v-icon size="small" start color="primary">mdi-check-all</v-icon>Garmin and Wahoo sensors tracking</li>
                                 <li><v-icon size="small" start color="primary">mdi-check-all</v-icon>Automatic FTP estimation and update</li>
                                 <li><v-icon size="small" start color="primary">mdi-check-all</v-icon>MCP server</li>
                                 <li><v-icon size="small" start color="primary">mdi-check-all</v-icon>No ads, no backlinks</li>
