@@ -6,13 +6,15 @@
 ## Pull Requests (PR)
 
 - PRs can only be opened if the repo is building successfully. If it fails to build, troubleshoot and fix the issue first.
-- Complex PRs with lots of new features and many considerable changes to the codebase, which might still need tweaks, must be created as "draft". Other PRs are created as "ready to review".
+- Complex PRs with lots of new features and many considerable changes to the codebase, which might still need tweaks, must be created as "draft". Other PRs can be created as "ready to review" directly.
+- The PR title must be short and have a maximum of 10 words.
 - The PR description MUST be split into the following sections: `New features`, `Breaking changes`, `Other changes`. If there are no new features or no breaking changes, do not create these sections. If only minor changes are present, use just `Changes` instead of `Other changes`.
 - If the PR is changing the frontend in a meaningful way, or if it's a small PR that has nothing but frontend updates, include screenshots showcasing the changes, under a section `Screenshots`. Use the branch `pr-assets` for uploaded screenshots. Make sure to delete locally created screenshots once they have been uploaded.
 - Do NOT expose information local dev URLs, ports, or other dev-only notes in the PR descriptions.
 - Do NOT add minor technical changes to the PR descriptions like version and lockfile updates, updated README and renamed files. Also no need to describe how the changes were validated or tested. These kind of information belongs to commit messages instead.
 - **Do NOT add attributions to commit messages or PR descriptions**. No need to write "Made with Cursor" or "Made with Claude" or made with whatever. That includes the `Co-authored-by` attribution, which should not be added.
 - If you make a mistake and violate any of the rules above, for example by not following the description pattern, try fixing it on the same PR. If not possible at all, you should close the invalid PR and open a new one.
+- When committing new meaningful changes to an existing PR, make sure to update the PR details to reflects these changes (description, adding new screenshots and deleting old ones, etc).
 
 ### Sample Good PR Description
 
