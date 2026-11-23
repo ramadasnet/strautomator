@@ -20,6 +20,9 @@
     "spotify": {
         "disabled": true
     },
+    "strava": {
+        "webhookDisabled": true
+    },
     "wahoo": {
         "disabled": true
     }
